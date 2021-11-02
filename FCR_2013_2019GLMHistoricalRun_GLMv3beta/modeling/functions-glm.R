@@ -188,8 +188,9 @@ run_glm <- function(os){
     file.copy('aed2/aed4.nml', 'aed2/aed2.nml', overwrite = TRUE)
     system("glm",ignore.stdout=TRUE)
   } else if (os == "Compiled"){
-    sim_folder = "/Users/cayelan/Dropbox/ComputerFiles/SCC/FCR-GLM/FCR_2013_2019GLMHistoricalRun_GLMv3beta" #BE SURE TO EDIT THIS!
-    system2(paste0(sim_folder, "/", "glm"), stdout = TRUE, stderr = TRUE, env = paste0("DYLD_LIBRARY_PATH=",sim_folder))
+    #sim_folder = "/Users/cayelan/Dropbox/ComputerFiles/SCC/AED_Forecasting/FCR-GLM-AED-Forecasting/FCR_2013_2019GLMHistoricalRun_GLMv3beta" #BE SURE TO EDIT THIS!
+    GLM3r::run_glm(sim_folder = sim_folder, verbose=F)
+    #system2(paste0(sim_folder, "/", "glm"), stdout = TRUE, stderr = TRUE, env = paste0("DYLD_LIBRARY_PATH=",sim_folder))
   }
 }
 

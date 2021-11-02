@@ -12,6 +12,8 @@
 remotes::install_github("CareyLabVT/GLMr", force = T)
 remotes::install_github("CareyLabVT/glmtools", force = T)
 
+devtools::install_github("FLARE-forecast/GLM3r")
+
 # Load packages, set sim folder, load nml file ####
 if (!require('pacman')) install.packages('pacman'); library('pacman')
 pacman::p_load(tidyverse, lubridate, ncdf4, GLMr, glmtools)
@@ -31,6 +33,10 @@ print(aed)
 print(aed_phytos)
 
 ##### run the model! #######
+
+GLM3r::run_glm(verbose=F)
+
+
 system2(paste0(sim_folder, "/", "glm"), stdout = TRUE, stderr = TRUE, env = paste0("DYLD_LIBRARY_PATH=",sim_folder))
 #sometimes, you'll get an error that says "Error in file, 'Time(Date)' is not first column!
 #in this case, open the input file in Excel, set the column in Custom ("YYYY-MM-DD") format, resave, and close the file
