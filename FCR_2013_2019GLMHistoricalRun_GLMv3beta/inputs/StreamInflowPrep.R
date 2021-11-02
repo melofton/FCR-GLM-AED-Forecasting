@@ -21,16 +21,16 @@ library(tidyverse)
 library(lubridate)
 library(dplyr)
 
-#first read in FCR weir inflow file from EDI
-inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/6/96bdffa73741ec6b43a98f2c5d15daeb" 
-infile1 <- paste0(getwd(),"/inflow_for_EDI_2013_06Mar2020.csv")
+#first read in FCR weir inflow file from EDI (updated for 2013-Dec 2020)
+inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/7/f5fa5de4b49bae8373f6e7c1773b026e" 
+infile1 <- paste0(getwd(),"/inflow_for_EDI_2013_10Jan2021.csv")
 download.file(inUrl1,infile1,method="curl")
 
-inflow<-read_csv("inflow_for_EDI_2013_06Mar2020.csv") %>% 
+inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>% 
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
   rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
-  dplyr::filter(time < "2020-01-01") %>%
+  dplyr::filter(time < "2021-01-01") %>%
   group_by(time) %>% 
   summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
  
@@ -38,7 +38,7 @@ inflow<-read_csv("inflow_for_EDI_2013_06Mar2020.csv") %>%
 plot(inflow$time, inflow$FLOW)
 
 #creating new dataframe with list of all dates
-datelist<-seq.Date(as.Date("2013/05/15"),as.Date("2019/12/31"), "days")
+datelist<-seq.Date(as.Date("2013/05/16"),as.Date("2020/12/31"), "days") #changed from May 15, 2013 because of NA in flow
 datelist<-as.data.frame(datelist)
 colnames(datelist)=c("time")
 datelist$time<-as.POSIXct(strptime(datelist$time, "%Y-%m-%d", tz="EST"))
@@ -56,18 +56,18 @@ plot(weir$time, weir$FLOW, type = "o")
 plot(weir$time, weir$TEMP, type = "l", col = "red")
 
 #now let's merge with chemistry
-#first pull in FCR chem data from 2013-2019 from EDI
-inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/6/2b3dc84ae6b12d10bd5485f1c300af13" 
-infile1 <- paste0(getwd(),"/chem.csv")
+#first pull in FCR chem data from 2013-2020 from EDI
+inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/8/da174082a3d924e989d3151924f9ef98" 
+infile1 <- paste0(getwd(),"/chemistry.csv")
 download.file(inUrl1,infile1,method="curl")
 
-FCRchem <- read.csv("chem.csv", header=T) %>%
+FCRchem <- read.csv("chemistry.csv", header=T) %>%
   select(Reservoir:DIC_mgL) %>%
   dplyr::filter(Reservoir=="FCR") %>%
   dplyr::filter(Site==100) %>%
   mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
   rename(time = DateTime) %>%
-  filter(TP_ugL < 100) %>% #remove outliers
+  dplyr::filter(TP_ugL < 100) %>% #remove outliers
   select(time:DIC_mgL) 
 
 #read in lab dataset of dissolved silica, measured in summer 2014 only
@@ -135,48 +135,53 @@ for(i in 1:length(ghg2$time)){
 }  
 plot(ghg2$time, ghg2$CAR_ch4)
 #check to make sure it all works: each day's CH4 concentration during
-#2013-early 2015 is the mean daily data for 2015-2019
+#2013-early 2015 is the mean daily data for 2015-2020
 
 
 #some other cool long-term plots
 plot(alldata$time, alldata$SRP_ugL)
 plot(alldata$time, alldata$DOC_mgL)
-plot(alldata$time, alldata$NO3NO2_ugL)
+plot(alldata$time, alldata$NO3NO2_ugL) #something's off here
 plot(alldata$time, alldata$NH4_ugL)
 plot(alldata$time, alldata$TN_ugL)
 plot(alldata$time, alldata$TP_ugL)
 plot(alldata$time, alldata$DIC_mgL)
 
-alldata<-merge(alldata, ghg2, by="time", all.x=TRUE)
+alldata<-merge(alldata, ghg2, by="time", all.x=TRUE) %>% 
+  group_by(time) %>% 
+  summarise_all(mean, na.RM=TRUE)
 
+alldata$time[which(duplicated(alldata$time))]
+
+lastrow <- length(alldata$time) #need for extend function below
 #now need to interpolate missing values in chem; setting 1st and last value in time series as medians
 #then linearly interpolating the middle missing values
 alldata$TN_ugL[1]<-median(na.exclude(alldata$TN_ugL))
-alldata$TN_ugL[2423]<-median(na.exclude(alldata$TN_ugL)) #2423 = last row
+alldata$TN_ugL[lastrow]<-median(na.exclude(alldata$TN_ugL)) 
 alldata$TN_ugL<-na.fill(na.approx(alldata$TN_ugL),"extend")
 
 alldata$TP_ugL[1]<-median(na.exclude(alldata$TP_ugL))
-alldata$TP_ugL[2423]<-median(na.exclude(alldata$TP_ugL))
+alldata$TP_ugL[lastrow]<-median(na.exclude(alldata$TP_ugL))
 alldata$TP_ugL<-na.fill(na.approx(alldata$TP_ugL),"extend")
 
 alldata$NH4_ugL[1]<-median(na.exclude(alldata$NH4_ugL))
-alldata$NH4_ugL[2423]<-median(na.exclude(alldata$NH4_ugL))
+alldata$NH4_ugL[lastrow]<-median(na.exclude(alldata$NH4_ugL))
 alldata$NH4_ugL<-na.fill(na.approx(alldata$NH4_ugL),"extend")
 
 alldata$NO3NO2_ugL[1]<-median(na.exclude(alldata$NO3NO2_ugL))
-alldata$NO3NO2_ugL[2423]<-median(na.exclude(alldata$NO3NO2_ugL))
+alldata$NO3NO2_ugL[lastrow]<-median(na.exclude(alldata$NO3NO2_ugL))
 alldata$NO3NO2_ugL<-na.fill(na.approx(alldata$NO3NO2_ugL),"extend")
 
 alldata$SRP_ugL[1]<-median(na.exclude(alldata$SRP_ugL))
-alldata$SRP_ugL[2423]<-median(na.exclude(alldata$SRP_ugL))
+alldata$SRP_ugL[lastrow]<-median(na.exclude(alldata$SRP_ugL))
 alldata$SRP_ugL<-na.fill(na.approx(alldata$SRP_ugL),"extend")
 
 alldata$DOC_mgL[1]<-median(na.exclude(alldata$DOC_mgL))
-alldata$DOC_mgL[2423]<-median(na.exclude(alldata$DOC_mgL))
+alldata$DOC_mgL[lastrow]<-median(na.exclude(alldata$DOC_mgL))
 alldata$DOC_mgL<-na.fill(na.approx(alldata$DOC_mgL),"extend")
 
 alldata$DIC_mgL[1]<-median(na.exclude(alldata$DIC_mgL))
-alldata$DIC_mgL[2423]<-median(na.exclude(alldata$DIC_mgL))
+alldata$DIC_mgL[lastrow]<-median(na.exclude(alldata$DIC_mgL))
 alldata$DIC_mgL<-na.fill(na.approx(alldata$DIC_mgL),"extend")
 
 alldata <- alldata[(!duplicated(alldata$time)),]#remove duplicated dates
@@ -222,10 +227,32 @@ weir_inflow <- weir_inflow %>%
 
 #write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
 #write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200828_allfractions_2poolsDOC.csv", row.names = F)
+write.csv(weir_inflow, "FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC.csv", row.names = F)
 
 #copying dataframe in workspace to be used later
 alltdata = alldata
+
+##############################################
+#need to make outflow for weir-only outflow
+outflow <- weir_inflow %>% #from above: this has both stream inflows together
+  select(time, FLOW) %>%
+  mutate_if(is.numeric, round, 4) #round to 4 digits 
+
+#diagnostic plot
+plot(outflow$time, outflow$FLOW)
+
+#write file
+write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2020_20211102.csv", row.names=F)
+##############################################
+
+
+
+
+
+
+
+
+
 
 ########SKIP THIS STEP IF YOU WANT TO USE 2 POOLS OF OC! 
 #The code below is for the 1 pool option
