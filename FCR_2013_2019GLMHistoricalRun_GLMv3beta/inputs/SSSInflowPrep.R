@@ -17,7 +17,7 @@ library(tidyverse)
 library(lubridate)
 
 #pull in SSS operations file 
-inflowoxy<-read.csv("HOx_Operations_20190916.csv", header=T) %>%
+inflowoxy<-read.csv("Calc_HOX_flow_DO_20211102.csv", header=T) %>%
 #within this file, the eductor nozzles increased flow rate by a factor of 4, so 227 LPM = 1135 LPM
   select(time,SSS_m3.day,mmol.O2.m3.day) %>%
   mutate(SSS_m3.day = SSS_m3.day * (1/86400))  %>%
@@ -57,22 +57,22 @@ highox <- inflowoxy %>%
 
 #now, need to set water temperature of this file to CTD observations at 8 m, the depth
 # the HOx injects water into the hypolimnion
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/200/10/2461524a7da8f1906bfc3806d594f94c" 
-#infile1 <- paste0(getwd(),"/CTD_final_2013_2019.csv")
-#download.file(inUrl1,infile1,method="curl")
+inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/200/11/d771f5e9956304424c3bc0a39298a5ce" 
+infile1 <- paste0(getwd(),"/CTD_final_2013_2020.csv")
+download.file(inUrl1,infile1,method="curl")
 
-CTD<-read.csv("CTD_final_2013_2019.csv", header=TRUE) #now need to get temp at 8m for inflow
+CTD<-read.csv("CTD_final_2013_2020.csv", header=TRUE) #now need to get temp at 8m for inflow
 CTD8 <- CTD %>%
   select(Reservoir:Temp_C) %>%
-  filter(Reservoir=="FCR") %>%
-  filter(Site==50) %>%
+  dplyr::filter(Reservoir=="FCR") %>%
+  dplyr::filter(Site==50) %>%
   rename(time=Date, TEMP=Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
   mutate(Depth_m = round(Depth_m, digits=0)) %>%
   group_by(time) %>% 
-  filter(Depth_m==8) %>%
+  dplyr::filter(Depth_m==8) %>%
   summarise(TEMP=mean(TEMP)) %>%
-  filter(TEMP<17) #remove outlier from 2014
+  dplyr::filter(TEMP<17) #remove outlier from 2014
 
 #diagnostic plot to check for 8m water temp
 plot(CTD8$time, CTD8$TEMP, type = "o")
@@ -85,7 +85,9 @@ SSS_inflowALL$TEMP[961]<-4
 SSS_inflowALL$TEMP[1326]<-4
 SSS_inflowALL$TEMP[1691]<-4
 SSS_inflowALL$TEMP[2056]<-4
-SSS_inflowALL$TEMP[2422]<-4 #set last row as 4oC in prep for freezing
+SSS_inflowALL$TEMP[2422]<-4 
+SSS_inflowALL$TEMP[2788]<-4 
+SSS_inflowALL$TEMP[3153]<-4 #set last row as 4oC in prep for freezing
 SSS_inflowALL$TEMP<-na.fill(na.approx(SSS_inflowALL$TEMP),"extend")
 plot(SSS_inflowALL$time, SSS_inflowALL$TEMP, type = "o")
 
@@ -97,4 +99,4 @@ SSS_inflowALL[which(duplicated(SSS_inflowALL$time)),] #identify if there are rep
 SSS_inflowALL <- SSS_inflowALL[(!duplicated(SSS_inflowALL$time)),] #remove repeated dates
 
 #et voila! the final observed inflow file for the SSS for 2 pools of DOC
-write.csv(SSS_inflowALL, "FCR_SSS_inflow_2013_2019_20200701_allfractions_2DOCpools.csv", row.names = FALSE)
+write.csv(SSS_inflowALL, "FCR_SSS_inflow_2013_2019_20211102_allfractions_2DOCpools.csv", row.names = FALSE)
