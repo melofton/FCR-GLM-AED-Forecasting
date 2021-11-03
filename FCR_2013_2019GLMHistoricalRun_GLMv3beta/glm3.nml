@@ -103,7 +103,7 @@
    inflow_factor = 1, 0.2 !1, 0.2
    strmbd_drag = 0.03, 0.03! 0.016, 0.03
    subm_elev = 9, 1.2! 9, 1.2
-   inflow_fl = 'inputs/FCR_weir_inflow_2013_2019_20200828_allfractions_2poolsDOC.csv','inputs/FCR_SSS_inflow_2013_2019_20200701_allfractions_2DOCpools.csv'!'inputs/FCR_wetland_inflow_2013_2019_20200828_allfractions_2DOCpools.csv','inputs/FCR_SSS_inflow_2013_2019_20200701_allfractions_2DOCpools.csv'
+   inflow_fl = 'inputs/FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC.csv','inputs/FCR_SSS_inflow_2013_2021_20211102_allfractions_2DOCpools.csv'!'inputs/FCR_wetland_inflow_2013_2019_20200828_allfractions_2DOCpools.csv','inputs/FCR_SSS_inflow_2013_2019_20200701_allfractions_2DOCpools.csv'
    inflow_varnum = 19
    inflow_vars = 'FLOW','TEMP','SALT','OXY_oxy','NIT_amm','NIT_nit','PHS_frp','OGM_doc','OGM_docr','OGM_poc','OGM_don','OGM_donr','OGM_pon','OGM_dop','OGM_dopr','OGM_pop','CAR_dic','CAR_ch4','SIL_rsi'
 /
@@ -113,7 +113,7 @@
    outl_elvs = 506.9
    bsn_len_outl = 711.699
    bsn_wid_outl = 226.03
-   outflow_fl = 'inputs/FCR_spillway_outflow_SUMMED_WeirWetland_2013_2019_20200615.csv'
+   outflow_fl = 'inputs/FCR_spillway_outflow_WeirOnly_2013_2020_20211102.csv'
    outflow_factor = 1
 /
 &snowice

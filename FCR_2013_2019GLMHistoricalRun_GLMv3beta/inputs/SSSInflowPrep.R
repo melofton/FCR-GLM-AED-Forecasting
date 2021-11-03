@@ -99,4 +99,4 @@ SSS_inflowALL[which(duplicated(SSS_inflowALL$time)),] #identify if there are rep
 SSS_inflowALL <- SSS_inflowALL[(!duplicated(SSS_inflowALL$time)),] #remove repeated dates
 
 #et voila! the final observed inflow file for the SSS for 2 pools of DOC
-write.csv(SSS_inflowALL, "FCR_SSS_inflow_2013_2019_20211102_allfractions_2DOCpools.csv", row.names = FALSE)
+write.csv(SSS_inflowALL, "FCR_SSS_inflow_2013_2021_20211102_allfractions_2DOCpools.csv", row.names = FALSE)
