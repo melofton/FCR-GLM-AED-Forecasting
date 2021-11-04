@@ -9,14 +9,14 @@
 #*        variables, and calculates RMSE for each depth.
 #*****************************************************************
 
-remotes::install_github("CareyLabVT/GLMr", force = T)
+#remotes::install_github("CareyLabVT/GLMr", force = T)
+remotes::install_github("FLARE-forecast/GLM3r")
 remotes::install_github("CareyLabVT/glmtools", force = T)
 
-devtools::install_github("FLARE-forecast/GLM3r")
 
 # Load packages, set sim folder, load nml file ####
 if (!require('pacman')) install.packages('pacman'); library('pacman')
-pacman::p_load(tidyverse, lubridate, ncdf4, GLMr, glmtools)
+pacman::p_load(tidyverse, lubridate, ncdf4, glmtools, GLM3r)
 
 setwd("./FCR_2013_2019GLMHistoricalRun_GLMv3beta")
 sim_folder <- getwd()
@@ -35,9 +35,7 @@ print(aed_phytos)
 ##### run the model! #######
 
 GLM3r::run_glm(verbose=F)
-
-
-system2(paste0(sim_folder, "/", "glm"), stdout = TRUE, stderr = TRUE, env = paste0("DYLD_LIBRARY_PATH=",sim_folder))
+#system2(paste0(sim_folder, "/", "glm"), stdout = TRUE, stderr = TRUE, env = paste0("DYLD_LIBRARY_PATH=",sim_folder))
 #sometimes, you'll get an error that says "Error in file, 'Time(Date)' is not first column!
 #in this case, open the input file in Excel, set the column in Custom ("YYYY-MM-DD") format, resave, and close the file
 nc_file <- file.path(sim_folder, 'output/output.nc') #defines the output.nc file 
@@ -165,7 +163,7 @@ obs_oxy<-read.csv('field_data/CleanedObsOxy.csv') %>%
   mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST")))
 field_file <- file.path(sim_folder,'/field_data/CleanedObsOxy.csv') 
 depths<- c(0.1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9.2) 
-#plot_var_compare(nc_file,field_file,var_name = var, precision="days",col_lim = c(0,600)) #compare obs vs modeled
+plot_var_compare(nc_file,field_file,var_name = var, precision="days",col_lim = c(0,600)) #compare obs vs modeled
 
 #get modeled oxygen concentrations for focal depths
 mod_oxy <- get_var(nc_file, "OXY_oxy", reference="surface", z_out=depths) %>%

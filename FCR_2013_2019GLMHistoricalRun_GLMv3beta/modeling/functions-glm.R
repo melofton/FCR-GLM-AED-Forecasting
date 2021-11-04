@@ -805,8 +805,8 @@ run_calibvalid <- function(var, var_unit, var_seq, cal_pars, pars, ub, lb, init.
   #   file.copy('aed2/aed4.nml', 'aed2/aed2.nml', overwrite = TRUE)
   # }
 
-  calibration.list <- list("start" = '2013-05-15 12:00:00',
-                           "stop" = '2018-12-31 12:00:00')  #EDIT THIS!
+  calibration.list <- list("start" = '2015-07-07 12:00:00',
+                           "stop" = '2018-07-07 12:00:00')  #EDIT THIS!
   nml <- read_nml('glm3.nml')
   nml <- set_nml(nml, arg_list = calibration.list)
   write_nml(nml, 'glm3.nml')
@@ -908,7 +908,7 @@ run_calibvalid <- function(var, var_unit, var_seq, cal_pars, pars, ub, lb, init.
   
   
   validation.list <- list("start" = '2019-01-01 00:00:00',
-                          "stop" = '2019-12-31 12:00:00') # EDIT THIS
+                          "stop" = '2020-12-31 12:00:00') # EDIT THIS
   nml <- read_nml('glm3.nml')
   nml <- set_nml(nml, arg_list = validation.list)
   write_nml(nml, 'glm3.nml')
@@ -923,7 +923,7 @@ run_calibvalid <- function(var, var_unit, var_seq, cal_pars, pars, ub, lb, init.
   dev.off()
   
   
-  total.list <- list("start" = '2013-05-15 12:00:00', "stop" = '2019-12-31 12:00:00') #EDIT THIS!
+  total.list <- list("start" = '2015-07-07 12:00:00', "stop" = '2020-12-31 12:00:00') #EDIT THIS!
                 #EDIT THIS
                 #list("start" = '1980-04-01 00:00:00',
                 #     "stop" = '2015-12-31 00:00:00')
