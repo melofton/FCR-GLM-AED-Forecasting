@@ -1,8 +1,8 @@
 par,lb,ub,x0
 sw_factor,0.75,1.25,1
 lw_factor,0.75,1.25,1
-subm_elev,0,9.1,9
-subm_elev,1,1.3,1.2
+coef_mix_hyp,0.2,0.8,0.5
+ch,5.00E-04,0.002,0.0013
 sed_temp_amplitude,2,12,4
 sed_temp_amplitude,2,12,7
 sed_temp_mean,3,20,11
