@@ -1,4 +1,3 @@
 par,lb,ub,x0
-Fsed_frp,0.01,0.015,0.011
+Fsed_frp,0.005,0.015,0.01
 Fsed_frp,0.015,0.3,0.2
-Ksed_frp,1,150,25
