@@ -10,6 +10,7 @@
 
 
 setwd("FCR_2013_2019GLMHistoricalRun_GLMv3beta/inputs")
+setwd("./inputs")
 sim_folder <- getwd()
 
 #load packages
@@ -22,17 +23,17 @@ library(lubridate)
 library(dplyr)
 
 #first read in FCR weir inflow file from EDI (updated for 2013-Dec 2020)
-inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/7/f5fa5de4b49bae8373f6e7c1773b026e" 
-infile1 <- paste0(getwd(),"/inflow_for_EDI_2013_10Jan2021.csv")
-download.file(inUrl1,infile1,method="curl")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/7/f5fa5de4b49bae8373f6e7c1773b026e" 
+#infile1 <- paste0(getwd(),"/inflow_for_EDI_2013_10Jan2021.csv")
+#download.file(inUrl1,infile1,method="curl")
 
 inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>% 
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
-  rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
+  dplyr::rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
   dplyr::filter(time < "2021-01-01") %>%
   group_by(time) %>% 
-  summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
+  dplyr::summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
  
 #diagnostic plot
 plot(inflow$time, inflow$FLOW)
@@ -57,11 +58,11 @@ plot(weir$time, weir$TEMP, type = "l", col = "red")
 
 #now let's merge with chemistry
 #first pull in FCR chem data from 2013-2020 from EDI
-inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/8/da174082a3d924e989d3151924f9ef98" 
-infile1 <- paste0(getwd(),"/chemistry.csv")
-download.file(inUrl1,infile1,method="curl")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/8/da174082a3d924e989d3151924f9ef98" 
+#infile1 <- paste0(getwd(),"/chemistry.csv")
+#download.file(inUrl1,infile1,method="curl")
 
-FCRchem <- read.csv("chemistry.csv", header=T) %>%
+FCRchem <- read.csv("chemistry_HLW_edited.csv", header=T) %>%
   select(Reservoir:DIC_mgL) %>%
   dplyr::filter(Reservoir=="FCR") %>%
   dplyr::filter(Site==100) %>%
@@ -71,9 +72,9 @@ FCRchem <- read.csv("chemistry.csv", header=T) %>%
   select(time:DIC_mgL) 
 
 #read in lab dataset of dissolved silica, measured in summer 2014 only
-inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/542/1/791ec9ca0f1cb9361fa6a03fae8dfc95" 
-infile1 <- paste0(getwd(),"/silica_master_df.csv")
-download.file(inUrl1,infile1,method="curl")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/542/1/791ec9ca0f1cb9361fa6a03fae8dfc95" 
+#infile1 <- paste0(getwd(),"/silica_master_df.csv")
+#download.file(inUrl1,infile1,method="curl")
 
 silica <- read.csv("silica_master_df.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>% 
@@ -91,9 +92,9 @@ median(silica$DRSI_mgL) #this median concentration is going to be used to set as
 alldata<-merge(weir, FCRchem, by="time", all.x=TRUE)
 
 #read in dataset of CH4 from EDI
-inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/5/38d72673295864956cccd6bbba99a1a3" 
-infile1 <- paste0(getwd(),"/Dissolved_CO2_CH4_Virginia_Reservoirs.csv")
-download.file(inUrl1,infile1,method="curl")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/5/38d72673295864956cccd6bbba99a1a3" 
+#infile1 <- paste0(getwd(),"/Dissolved_CO2_CH4_Virginia_Reservoirs.csv")
+#download.file(inUrl1,infile1,method="curl")
 
 ghg <- read.csv("Dissolved_CO2_CH4_Virginia_Reservoirs.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>%
@@ -192,7 +193,7 @@ weir_inflow <- alldata %>%
   mutate(NIT_nit = NO3NO2_ugL*1000*0.001*(1/62.00)) %>% #as all NO2 is converted to NO3
   mutate(PHS_frp = SRP_ugL*1000*0.001*(1/94.9714)) %>% 
   mutate(OGM_doc = DOC_mgL*1000*(1/12.01)* 0.10) %>% #assuming 10% of total DOC is in labile DOC pool (Wetzel page 753)
-  mutate(OGM_docr = DOC_mgL*1000*(1/12.01)* 0.90) %>% #assuming 90% of total DOC is in recalcitrant DOC pool
+  mutate(OGM_docr = 1.5*DOC_mgL*1000*(1/12.01)* 0.90) %>% #assuming 90% of total DOC is in recalcitrant DOC pool
   mutate(TN_ugL = TN_ugL*1000*0.001*(1/14)) %>% 
   mutate(TP_ugL = TP_ugL*1000*0.001*(1/30.97)) %>% 
   mutate(OGM_poc = 0.1*(OGM_doc+OGM_docr)) %>% #assuming that 10% of DOC is POC (Wetzel page 755)
@@ -227,7 +228,7 @@ weir_inflow <- weir_inflow %>%
 
 #write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
 #write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-write.csv(weir_inflow, "FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC.csv", row.names = F)
+write.csv(weir_inflow, "FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
 
 #copying dataframe in workspace to be used later
 alltdata = alldata
@@ -244,6 +245,20 @@ plot(outflow$time, outflow$FLOW)
 #write file
 write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2020_20211102.csv", row.names=F)
 ##############################################
+
+#creating climatology weir inflow file for Quinn: average of day of year for all analytes
+
+climatology_mean <- weir_inflow %>% 
+  mutate(DOY = yday(time)) %>%
+  group_by(DOY) %>%
+  summarise(CAR_ch4=mean(CAR_ch4))
+
+
+
+
+
+
+
 
 
 
