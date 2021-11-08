@@ -82,8 +82,8 @@
    meteo_fl = 'inputs/met.csv'
    subdaily = .true.
    wind_factor = 1
-   sw_factor = 0.902838889
-   lw_factor = 0.888758321
+   sw_factor = 0.9028389
+   lw_factor = 0.8887583
    at_factor = 1
    rh_factor = 1
    rain_factor = 1
@@ -103,7 +103,7 @@
    inflow_factor = 1, 0.2
    strmbd_drag = 0.03, 0.03
    subm_elev = 7.166530546, 1.022787437
-   inflow_fl = 'inputs/FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC.csv','inputs/FCR_SSS_inflow_2013_2021_20211102_allfractions_2DOCpools.csv'
+   inflow_fl = 'inputs/FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC_1dot5xDOCr.csv','inputs/FCR_SSS_inflow_2013_2021_20211102_allfractions_2DOCpools.csv'
    inflow_varnum = 19
    inflow_vars = 'FLOW','TEMP','SALT','OXY_oxy','NIT_amm','NIT_nit','PHS_frp','OGM_doc','OGM_docr','OGM_poc','OGM_don','OGM_donr','OGM_pon','OGM_dop','OGM_dopr','OGM_pop','CAR_dic','CAR_ch4','SIL_rsi'
 /
