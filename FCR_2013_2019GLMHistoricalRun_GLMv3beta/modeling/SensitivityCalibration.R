@@ -28,8 +28,8 @@ plot_var(file=out,"OXY_oxy",reference="surface")
 
 # GET FIELD DATA FOR CALIBRATION AND VALIDATION  ---------------------------
 # WTR AND OXY DATA
-field_temp<-read.csv("field_data/CleanedObsTemp1.csv", header=T)
-field_oxy <-read.csv("field_data/CleanedObsOxy1.csv", header=T)
+field_temp<-read.csv("field_data/CleanedObsTemp.csv", header=T)
+field_oxy <-read.csv("field_data/CleanedObsOxy.csv", header=T)
 field_temp$DateTime <-as.POSIXct(strptime(field_temp$DateTime, "%Y-%m-%d", tz="EST"))
 field_oxy$DateTime <-as.POSIXct(strptime(field_oxy$DateTime, "%Y-%m-%d", tz="EST"))
 
@@ -398,7 +398,7 @@ ub <- cal_pars$ub
 lb <- cal_pars$lb
 #Create initial files
 #init.val <- rep(5, nrow(cal_pars))
-init.val <- (c(1,1,0.5, 0.0013,4,7,11,17,265,275) - lb) *10 /(ub-lb) # NEEDS TO BE UPDATED WITH STARTING VALUES FROM YOUR CALIBRATION FILE
+init.val <- (c(1,1,9,1.2,4,7,11,17,265,275) - lb) *10 /(ub-lb) # NEEDS TO BE UPDATED WITH STARTING VALUES FROM YOUR CALIBRATION FILE
 obs <- read_field_obs('field_data/CleanedObsTemp.csv', var)
 method = 'cmaes'
 calib.metric = 'RMSE'
@@ -431,7 +431,7 @@ ub <- cal_pars$ub
 lb <- cal_pars$lb
 #Create initial files
 #init.val <- rep(5, nrow(cal_pars))
-init.val <- (c(4.1,-25,-8) - lb) *10 /(ub-lb) # Paul's values
+init.val <- (c(-15,-1) - lb) *10 /(ub-lb)
 #obs <- read_field_obs('field_data/field_FCR.csv', var)
 obs <- read_field_obs('field_data/CleanedObsOxy.csv',var)
 method = 'cmaes'
@@ -571,7 +571,7 @@ pars <- cal_pars$par
 ub <- cal_pars$ub
 lb <- cal_pars$lb
 #Create initial files
-init.val <- (c(0.011, 0.2, 25) - lb) *10 /(ub-lb) 
+init.val <- (c(0.01, 0.2) - lb) *10 /(ub-lb) 
 obs <- read_field_obs('field_data/field_chem.csv', var)
 method = 'cmaes'
 calib.metric = 'RMSE'
