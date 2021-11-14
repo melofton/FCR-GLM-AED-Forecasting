@@ -7,7 +7,6 @@
 #*         then converted over for making the climatology inflow file
 #*****************************************************************
 
-
 setwd("FCR_2013_2019GLMHistoricalRun_GLMv3beta/inputs")
 setwd("./inputs")
 
@@ -19,10 +18,17 @@ library(tidyverse)
 library(magrittr)
 library(lubridate)
 library(dplyr)
+library(birk)
 
 #set the start and end dates of your inflow file
-start_date<-"2015-07-07"
-end_date<-"2020-12-31"
+start_date<-as.POSIXct(strptime("2015-07-07", "%Y-%m-%d", tz="EST"))
+end_date<-as.POSIXct(strptime("2020-12-31", "%Y-%m-%d", tz="EST"))
+
+#creating new dataframe with list of all dates
+datelist<-seq.Date(as.Date(start_date),as.Date(end_date), "days") #changed from May 15, 2013 because of NA in flow
+datelist<-as.data.frame(datelist)
+colnames(datelist)=c("time")
+datelist$time<-as.POSIXct(strptime(datelist$time, "%Y-%m-%d", tz="EST"))
 
 #first read in FCR weir inflow file from EDI (updated for 2013-Dec 2020)
 if(!file.exists('inflow_for_EDI_2013_10Jan2021.csv')){
@@ -35,18 +41,12 @@ inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>%
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
   dplyr::rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
-  dplyr::filter(time < "2021-01-01") %>%
+  dplyr::filter(time < end_date + lubridate::days(1)) %>%
   group_by(time) %>% 
   dplyr::summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
 
 #diagnostic plot
 # plot(inflow$time, inflow$FLOW)
-
-#creating new dataframe with list of all dates
-datelist<-seq.Date(as.Date(start_date),as.Date(end_date), "days") #changed from May 15, 2013 because of NA in flow
-datelist<-as.data.frame(datelist)
-colnames(datelist)=c("time")
-datelist$time<-as.POSIXct(strptime(datelist$time, "%Y-%m-%d", tz="EST"))
 
 #merge inflow file with datelist to make sure that we have all days covered 
 #interpolating the few missing days
@@ -97,7 +97,7 @@ silica <- read.csv("silica_master_df.csv", header=T) %>%
 # median(silica$DRSI_mgL) 
 #median conc is going to be set as the constant Si inflow conc in inflow
 
-alldata<-merge(weir, FCRchem, by="time", all.x=TRUE)
+all_data<-merge(weir, FCRchem, by="time", all.x=TRUE)
 
 #read in dataset of CH4 from EDI
 if(!file.exists("Dissolved_CO2_CH4_Virginia_Reservoirs.csv")){
@@ -116,54 +116,28 @@ ghg <- read.csv("Dissolved_CO2_CH4_Virginia_Reservoirs.csv", header=T) %>%
   drop_na %>% 
   summarise(CAR_ch4 = mean(CAR_ch4)) %>%
   dplyr::filter(CAR_ch4<0.2) #remove outliers
- plot(ghg$time, ghg$CAR_ch4)
+# plot(ghg$time, ghg$CAR_ch4)
 
-datelist2<-seq.Date(as.Date(first(ghg$time)),as.Date(last(ghg$time)), "days")
-datelist2<-as.data.frame(datelist2)
-colnames(datelist2)=c("time")
-datelist2$time<-as.POSIXct(strptime(datelist2$time, "%Y-%m-%d", tz="EST"))
-
-ghg1 <- merge(datelist2, ghg, by="time", all.x=TRUE) 
+ghg1 <- merge(datelist, ghg, by="time", all.x=TRUE) 
+#need to interpolate missing data, but first need to fill first & last values
+ghg1$CAR_ch4[1]<-ghg$CAR_ch4[which.closest(ghg$time, start_date)]
+ghg1$CAR_ch4[length(ghg1$CAR_ch4)]<-ghg$CAR_ch4[which.closest(ghg$time, end_date)]
 ghg1$CAR_ch4 <- na.fill(na.approx(ghg1$CAR_ch4), "extend")
 # plot(ghg1$time, ghg1$CAR_ch4) 
-#decent coverage 2015-2019, but need to develop 2013-2014 data that 
-# keeps temporal pattern of data so, need to average value among years per day of year
-
-missingdata <- ghg1 %>% 
-  mutate(DOY = yday(time)) %>%
-  group_by(DOY) %>%
-  summarise(CAR_ch4=mean(CAR_ch4))
-plot(missingdata$DOY, missingdata$CAR_ch4)
-#gives us DOY concentrations averaged across 2015-2019
-#now, need to apply this averaged DOY concentration to 2013-2014 missing dates
-
-ghg2 <- merge(datelist, ghg1, by="time", all.x=TRUE) %>% 
-  mutate(DOY = yday(time))
-
-for(i in 1:length(ghg2$time)){
-  if(is.na(ghg2$CAR_ch4[i])){
-    ghg2$CAR_ch4[i] = missingdata$CAR_ch4[which(missingdata$DOY==ghg2$DOY[i])]
-  }
-}  
-plot(ghg2$time, ghg2$CAR_ch4)
-#check to make sure it all works: each day's CH4 concentration during
-#2013-early 2015 is the mean daily data for 2015-2020
-
 
 #some other cool long-term plots
-plot(alldata$time, alldata$SRP_ugL)
-plot(alldata$time, alldata$DOC_mgL)
-plot(alldata$time, alldata$NO3NO2_ugL) #something's off here; need Heather's modified EDI chem file
-plot(alldata$time, alldata$NH4_ugL)
-plot(alldata$time, alldata$TN_ugL)
-plot(alldata$time, alldata$TP_ugL)
-plot(alldata$time, alldata$DIC_mgL)
+# plot(alldata$time, alldata$SRP_ugL)
+# plot(alldata$time, alldata$DOC_mgL)
+# plot(alldata$time, alldata$NO3NO2_ugL) #something's off here; need Heather's modified EDI chem file
+# plot(alldata$time, alldata$NH4_ugL)
+# plot(alldata$time, alldata$TN_ugL)
+# plot(alldata$time, alldata$TP_ugL)
+# plot(alldata$time, alldata$DIC_mgL)
 
-alldata<-merge(alldata, ghg2, by="time", all.x=TRUE) %>% 
+alldata<-merge(all_data, ghg1, by="time", all.y=TRUE) %>% 
   group_by(time) %>% 
   summarise_all(mean, na.RM=TRUE)
-
-alldata$time[which(duplicated(alldata$time))]
+#merge chem with CH4 data, truncating to start and end date period of CH4 (not chem)
 
 lastrow <- length(alldata$time) #need for extend function below
 #now need to interpolate missing values in chem; setting 1st and last value in time series as medians
@@ -218,9 +192,9 @@ weir_inflow <- alldata %>%
 #given this disparity, using a 50-50 weighted molecular weight (44.01 g/mol and 61.02 g/mol, respectively)
 
 
-#reality check of mass balance: these histograms should be at zero minus rounding errors
-hist(weir_inflow$TP_ugL - (weir_inflow$PHS_frp + weir_inflow$OGM_dop + weir_inflow$OGM_dopr + weir_inflow$OGM_pop))
-hist(weir_inflow$TN_ugL - (weir_inflow$NIT_amm + weir_inflow$NIT_nit + weir_inflow$OGM_don + weir_inflow$OGM_donr + weir_inflow$OGM_pon))
+#reality check of mass balance
+# hist(weir_inflow$TP_ugL - (weir_inflow$PHS_frp + weir_inflow$OGM_dop + weir_inflow$OGM_dopr + weir_inflow$OGM_pop))
+# hist(weir_inflow$TN_ugL - (weir_inflow$NIT_amm + weir_inflow$NIT_nit + weir_inflow$OGM_don + weir_inflow$OGM_donr + weir_inflow$OGM_pon))
 
 #creating OXY_oxy column using RMR package, assuming that oxygen is at 100% saturation in this very well-mixed stream
 for(i in 1:length(weir_inflow$TEMP)){
@@ -237,15 +211,9 @@ weir_inflow <- weir_inflow %>%
   mutate(SIL_rsi = SIL_rsi*1000*(1/60.08)) %>% #setting the Silica concentration to the median 2014 inflow concentration for consistency
   mutate_if(is.numeric, round, 4) #round to 4 digits 
 
-#write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
-#write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-#write.csv(weir_inflow, "FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
-
-#copying dataframe in workspace to be used later
-alltdata = alldata
 
 ##############################################
-#need to make outflow for weir-only outflow
+#First, let's make an outflow for weir-only outflow
 outflow <- weir_inflow %>% #from above: this has both stream inflows together
   select(time, FLOW) %>%
   mutate_if(is.numeric, round, 4) #round to 4 digits 
