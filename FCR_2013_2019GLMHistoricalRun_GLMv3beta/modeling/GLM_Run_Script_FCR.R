@@ -163,7 +163,7 @@ obs_oxy<-read.csv('field_data/CleanedObsOxy.csv') %>%
   mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST")))
 field_file <- file.path(sim_folder,'/field_data/CleanedObsOxy.csv') 
 depths<- c(0.1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9.2) 
-plot_var_compare(nc_file,field_file,var_name = var, precision="days",col_lim = c(0,600)) #compare obs vs modeled
+#plot_var_compare(nc_file,field_file,var_name = var, precision="days",col_lim = c(0,600)) #compare obs vs modeled
 
 #get modeled oxygen concentrations for focal depths
 mod_oxy <- get_var(nc_file, "OXY_oxy", reference="surface", z_out=depths) %>%
@@ -210,6 +210,7 @@ RMSE(m_oxygen,o_oxygen)
 
 mod_oxy9 <- get_var(nc_file, "OXY_oxy", reference="surface", z_out=c(9.2)) 
 plot(mod_oxy9$DateTime, mod_oxy9$OXY_oxy_9.2, type="l")
+
 #diagnostic plot of DO at 9.2 m (just above sediments)
 
 
@@ -428,8 +429,8 @@ newdata <- resample_to_field(nc_file, field_file, precision="hours", method='int
                              var_name=var)
 newdata <-newdata[complete.cases(newdata),]
 
-mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
-obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
+mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
+obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
 RMSE(mod,obs)
 
 mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=9 & newdata$Depth<=9] 
@@ -541,8 +542,8 @@ newdata <- resample_to_field(nc_file, field_file, precision="hours", method='int
                              var_name=var)
 newdata <-newdata[complete.cases(newdata),]
 
-mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
-obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
+mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
+obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
 RMSE(mod,obs)
 
 mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=9 & newdata$Depth<=9] 
@@ -617,6 +618,7 @@ RMSE(mod,obs)
 
 
 
+
 #### dissolved organic carbon: labile ###########
 
 var="OGM_doc"
@@ -656,8 +658,8 @@ newdata <- resample_to_field(nc_file, field_file, precision="hours", method='int
                              var_name=var)
 newdata <-newdata[complete.cases(newdata),]
 
-mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
-obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
+mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
+obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
 RMSE(mod,obs)
 
 mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=9 & newdata$Depth<=9] 
@@ -863,7 +865,6 @@ RMSE(mod,obs)
 mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=0.1 & newdata$Depth<=9.3] 
 obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=0.1 & newdata$Depth<=9.3] 
 RMSE(mod,obs)
-
 
 
 #### total organic carbon ###########

@@ -10,17 +10,12 @@
 setwd("FCR_2013_2019GLMHistoricalRun_GLMv3beta/inputs")
 setwd("./inputs")
 
-#load packages
-library(zoo)
-library(EcoHydRology)
-library(rMR)
-library(tidyverse)
-library(magrittr)
-library(lubridate)
-library(dplyr)
-library(birk)
+if(!require('pacman')) install.packages('pacman'); library('pacman')
+pacman::p_load(zoo, EcoHydRology, rMR, tidyverse, magrittr, lubridate, 
+               ncdf4, glmtools, GLM3r, birk, dplyr)
 
-#set the start and end dates of your inflow file
+#set the start and end dates of the data going into potential aggregation for
+# your inflow file (you'll nail down exact dates below)
 start_date<-as.POSIXct(strptime("2015-07-07", "%Y-%m-%d", tz="EST"))
 end_date<-as.POSIXct(strptime("2020-12-31", "%Y-%m-%d", tz="EST"))
 
@@ -219,41 +214,95 @@ outflow <- weir_inflow %>% #from above: this has both stream inflows together
   mutate_if(is.numeric, round, 4) #round to 4 digits 
 
 #diagnostic plot
-plot(outflow$time, outflow$FLOW)
+# plot(outflow$time, outflow$FLOW)
 
 #write file
-write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2020_20211102.csv", row.names=F)
+write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2015_2020_20211114.csv", row.names=F)
 ##############################################
 
-#creating climatology weir inflow file for Quinn: average of day of year for all analytes
+#now, let's create the climatology weir inflow file for Quinn, by taking the
+# average of day of year for all analytes
+# First, need to choose which data go into the climatology calculations
 
-datelist<-weir_inflow %>% 
-  dplyr::filter(time>"2015-07-07" & time<"2018-07-07") %>% 
+clima_start <- as.POSIXct(strptime("2015-07-07", "%Y-%m-%d", tz="EST"))
+clima_end <-as.POSIXct(strptime("2018-07-07", "%Y-%m-%d", tz="EST"))
+
+weir_inflow_dates <- weir_inflow %>% 
+  dplyr::filter(time>clima_start & time<clima_end) %>% 
   mutate(DOY = yday(time)) %>%
   select(time, DOY) 
 
 meas_vars <- weir_inflow %>% 
   select(time:OXY_oxy)
 
-#check on all vars looking ok
-plot(weir_inflow$time, weir_inflow$FLOW)
-plot(weir_inflow$time, weir_inflow$TEMP)
-plot(weir_inflow$time, weir_inflow$SALT)
-plot(weir_inflow$time, weir_inflow$OXY_oxy)
-plot(weir_inflow$time, weir_inflow$NIT_amm)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$NIT_nit)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$PHS_frp)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_doc)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_docr)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_poc)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_don)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_donr)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_pon)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_dop)##flagged only after 2015
-plot(weir_inflow$time, weir_inflow$OGM_pop)##flagged only after 2015
-plot(weir_inflow$time, weir_inflow$CAR_dic)##flagged only after 2015
-plot(weir_inflow$time, weir_inflow$CAR_ch4)#flagged only after 2015
-plot(weir_inflow$time, weir_inflow$SIL_rsi)
+#check that all vars looking ok
+# plot(weir_inflow$time, weir_inflow$FLOW)
+# plot(weir_inflow$time, weir_inflow$TEMP)
+# plot(weir_inflow$time, weir_inflow$SALT)
+# plot(weir_inflow$time, weir_inflow$OXY_oxy)
+# plot(weir_inflow$time, weir_inflow$NIT_amm)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$NIT_nit)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$PHS_frp)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_doc)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_docr)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_poc)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_don)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_donr)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_pon)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_dop)##flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$OGM_pop)##flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$CAR_dic)##flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$CAR_ch4)#flagged only after 2015
+# plot(weir_inflow$time, weir_inflow$SIL_rsi)
+
+
+
+######building a model to increase stream inflow concentrations
+#inlake 1.6 concentrations
+obs<-read.csv('../field_data/field_chem.csv', header=TRUE) %>% #read in observed chemistry data
+  dplyr::mutate(time = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
+  dplyr::filter(Depth==1.6) %>% 
+  select(time, OGM_docr)
+
+#stream concs
+weirgrab<-weir_inflow %>% 
+  select(time,FLOW, TEMP, OGM_docr)
+
+#modeled
+nc_file <- file.path("/Users/cayelan/Dropbox/ComputerFiles/SCC/AED_Forecasting/FCR-GLM-AED-Forecasting/FCR_2013_2019GLMHistoricalRun_GLMv3beta/output", 'output.nc') #defines the output.nc file 
+
+mod<- get_var(nc_file, "OGM_docr", reference="surface", z_out=1.6) %>%
+  mutate(time = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>% 
+  select(time,OGM_docr_1.6)
+
+comp<-base::merge(obs,weirgrab,by=c("time"))
+comp1<-base::merge(comp,mod, by=c("time")) %>% 
+  rename(lakeobs=OGM_docr.x, 
+         stream=OGM_docr.y,
+         mod=OGM_docr_1.6) %>% 
+  mutate(factor=lakeobs-mod)
+
+plot(comp1$time, comp1$lakeobs, col="red", type="o")
+lines(comp1$time, comp1$stream, col="blue")
+lines(comp1$time, comp1$mod, col="black")
+plot(comp1$time,comp1$factor)
+
+model<- lm(comp1$factor ~ comp1$FLOW + comp1$stream + comp1$FLOW*comp1$stream)
+summary(model)
+
+#Cayelan: the next thing you need to do is take thes
+
+
+
+
+
+
+
+
+
+
+
+
 
 mean_DOY_data <- weir_inflow %>% 
   dplyr::filter(time>"2015-07-07" & time<"2018-07-07") %>% 
