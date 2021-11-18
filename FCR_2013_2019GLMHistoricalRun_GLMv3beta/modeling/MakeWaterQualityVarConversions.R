@@ -70,6 +70,7 @@ ggplot(fdom2doc, aes(EXOfDOM_QSU_1, OGM_doc_total, colour=factor(time))) +
   geom_abline(intercept = as.numeric(fdom2doc_model$coefficients[1]),
               slope = as.numeric(fdom2doc_model$coefficients[2]))
 
+#equation for the fDOM EXO --> OGM_doc_total model
 print(fdom2doc_model$coefficients[1])#intercept
 print(fdom2doc_model$coefficients[2])#slope
 print(sd(fdom2doc_model$residuals)) #standard deviation of the residuals
@@ -90,7 +91,6 @@ print(sd(fdom2doc_model$residuals)) #standard deviation of the residuals
 
 #####################################################
 #convert 1.6 EXO chla into CTD chla
-#convert 1.6 m EXO DO to CTD DO
 
 #need to pull in CTD data from EDI
 if(!file.exists("CTD_final_2013_2020.csv")){
@@ -137,9 +137,100 @@ print(EXO2ctd_chla_model$coefficients[1])#intercept
 print(EXO2ctd_chla_model$coefficients[2])#slope
 print(sd(EXO2ctd_chla_model$residuals)) #standard deviation of the residuals
 
+#####################################################
+#convert 1.6 m EXO DO to CTD DO
+
+#let's do DO conversion of 1.6 EXO DO into CTD DO second
+EXO2ctd_do <- EXO2ctd %>% 
+  dplyr::select(time, DO_mgL, EXODO_mgL_1) %>% 
+  na.exclude() %>% 
+  dplyr::mutate(OXY_oxy_CTD = DO_mgL*1000*(1/32),
+                OXY_oxy_EXO = EXODO_mgL_1*1000*(1/32))
+
+#model from which summary stats will be extracted
+EXO2ctd_do_model <- lm(OXY_oxy_CTD ~ OXY_oxy_EXO, data=EXO2ctd_do)
+
+#let's look at that DO!
+ggplot(EXO2ctd_do, aes(OXY_oxy_EXO, OXY_oxy_CTD, colour=factor(time))) + 
+  geom_point(alpha = 0.6) + 
+  geom_abline(intercept = as.numeric(EXO2ctd_do_model$coefficients[1]),
+              slope = as.numeric(EXO2ctd_do_model$coefficients[2]))
+
+#summary stats for DO model
+print(EXO2ctd_do_model$coefficients[1])#intercept
+print(EXO2ctd_do_model$coefficients[2])#slope
+print(sd(EXO2ctd_do_model$residuals)) #standard deviation of the residuals
+#THIS REGRESSION IS SO BAD THAT WE'RE NOT GOING TO USE IT IN FORECASTING MODE
+# BECAUSE DO IS SO UNDERPREDICTED BY CTD... GOING TO PRETEND EXO IS REAL-LIFE 
+# WHICH IS PROBABLY CLOSER TO REALITY, ANYWAY!
+
+#####################################################
+#convert 5 m DO sensor to CTD DO
+
+#need to filter CTD data at sensor depth (5 m)
+ctd_5 <- ctd %>% 
+  dplyr::filter(depth > 4.9,
+                depth < 5.1) %>% 
+  dplyr::mutate(time = date(time)) %>% 
+  dplyr::group_by(time) %>% 
+  dplyr::summarise(CTD_DO_5 = mean(DO_mgL))
+
+EXO2ctd_5 <- dplyr::inner_join(ctd_5, catwalk, by = c('time'))
+
+#let's do  conversion of 5 m do into CTD do first
+EXO2ctd_do5 <- EXO2ctd_5 %>% 
+  dplyr::select(time, CTD_DO_5, RDO_mgL_5_adjusted) %>% 
+  na.exclude()
+
+#model from which summary stats will be extracted
+EXO2ctd_do_5_model <- lm(CTD_DO_5 ~ RDO_mgL_5_adjusted, data=EXO2ctd_do5)
+
+#let's look at that chla!
+ggplot(EXO2ctd_do5, aes(RDO_mgL_5_adjusted, CTD_DO_5, colour=factor(time))) + 
+  geom_point(alpha = 0.6) + 
+  geom_abline(intercept = as.numeric(EXO2ctd_do_5_model$coefficients[1]),
+              slope = as.numeric(EXO2ctd_do_5_model$coefficients[2]), colour="black") +
+  geom_abline(intercept = 0, slope = 1, colour = "red")#1:1 line
+
+#summary stats for chla model
+print(EXO2ctd_do_5_model$coefficients[1])#intercept
+print(EXO2ctd_do_5_model$coefficients[2])#slope
+print(sd(EXO2ctd_do_5_model$residuals)) #standard deviation of the residuals
+#THE REGRESSION MODEL AND ONE-ONE LINE ARE SO CLOSE, NO NEED TO CONVERT EXO --> CTD AT 5M!
 
 
+#####################################################
+#convert 9 m DO sensor to CTD DO
 
+#need to filter CTD data at sensor depth (9 m)
+ctd_9 <- ctd %>% 
+  dplyr::filter(depth > 8.9,
+                depth < 9.1) %>% 
+  dplyr::mutate(time = date(time)) %>% 
+  dplyr::group_by(time) %>% 
+  dplyr::summarise(CTD_DO_9 = mean(DO_mgL))
 
-#convert 5 & 9 m DO sensor to CTD DO
+EXO2ctd_9 <- dplyr::inner_join(ctd_9, catwalk, by = c('time'))
+
+#let's do do conversion of 9 m DO  into CTD do first
+EXO2ctd_do9 <- EXO2ctd_9 %>% 
+  dplyr::select(time, CTD_DO_9, RDO_mgL_9_adjusted) %>% 
+  na.exclude()
+
+#model from which summary stats will be extracted
+EXO2ctd_do_9_model <- lm(CTD_DO_9 ~ RDO_mgL_9_adjusted, data=EXO2ctd_do9)
+
+#let's look at that chla!
+ggplot(EXO2ctd_do9, aes(RDO_mgL_9_adjusted, CTD_DO_9, colour=factor(time))) + 
+  geom_point(alpha = 0.6) + 
+  geom_abline(intercept = as.numeric(EXO2ctd_do_9_model$coefficients[1]),
+              slope = as.numeric(EXO2ctd_do_9_model$coefficients[2]), colour="black") +
+  geom_abline(intercept = 0, slope = 1, colour = "red")#1:1 line
+
+#summary stats for chla model
+print(EXO2ctd_do_9_model$coefficients[1])#intercept
+print(EXO2ctd_do_9_model$coefficients[2])#slope
+print(sd(EXO2ctd_do_9_model$residuals)) #standard deviation of the residuals
+#THE REGRESSION MODEL AND ONE-ONE LINE ARE SO CLOSE, NO NEED TO CONVERT EXO --> CTD AT 9M!
+
 
