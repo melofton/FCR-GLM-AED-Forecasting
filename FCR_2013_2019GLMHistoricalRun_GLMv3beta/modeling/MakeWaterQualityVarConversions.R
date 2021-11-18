@@ -150,11 +150,18 @@ EXO2ctd_do <- EXO2ctd %>%
 #model from which summary stats will be extracted
 EXO2ctd_do_model <- lm(OXY_oxy_CTD ~ OXY_oxy_EXO, data=EXO2ctd_do)
 
-#let's look at that DO!
+#let's look at that DO (mmol first)!
 ggplot(EXO2ctd_do, aes(OXY_oxy_EXO, OXY_oxy_CTD, colour=factor(time))) + 
   geom_point(alpha = 0.6) + 
   geom_abline(intercept = as.numeric(EXO2ctd_do_model$coefficients[1]),
               slope = as.numeric(EXO2ctd_do_model$coefficients[2]))
+
+#DO plot
+ggplot(EXO2ctd_do, aes(EXODO_mgL_1, DO_mgL, colour=factor(time))) + 
+  geom_point(alpha = 0.6) + 
+  geom_abline(intercept = as.numeric(EXO2ctd_do_model$coefficients[1]),
+              slope = as.numeric(EXO2ctd_do_model$coefficients[2]))
+
 
 #summary stats for DO model
 print(EXO2ctd_do_model$coefficients[1])#intercept
@@ -179,6 +186,8 @@ EXO2ctd_5 <- dplyr::inner_join(ctd_5, catwalk, by = c('time'))
 
 #let's do  conversion of 5 m do into CTD do first
 EXO2ctd_do5 <- EXO2ctd_5 %>% 
+  dplyr::mutate(CTD_DO_5 = CTD_DO_5*1000*(1/32),
+                RDO_mgL_5_adjusted = RDO_mgL_5_adjusted*1000*(1/32)) %>% 
   dplyr::select(time, CTD_DO_5, RDO_mgL_5_adjusted) %>% 
   na.exclude()
 
@@ -215,6 +224,8 @@ EXO2ctd_9 <- dplyr::inner_join(ctd_9, catwalk, by = c('time'))
 #let's do do conversion of 9 m DO  into CTD do first
 EXO2ctd_do9 <- EXO2ctd_9 %>% 
   dplyr::select(time, CTD_DO_9, RDO_mgL_9_adjusted) %>% 
+  dplyr::mutate(CTD_DO_9 = CTD_DO_9*1000*(1/32),
+                RDO_mgL_9_adjusted = RDO_mgL_9_adjusted*1000*(1/32)) %>% 
   na.exclude()
 
 #model from which summary stats will be extracted
@@ -233,4 +244,84 @@ print(EXO2ctd_do_9_model$coefficients[2])#slope
 print(sd(EXO2ctd_do_9_model$residuals)) #standard deviation of the residuals
 #THE REGRESSION MODEL AND ONE-ONE LINE ARE SO CLOSE, NO NEED TO CONVERT EXO --> CTD AT 9M!
 
+#####################################################
+#let's now look at within-day variability of the catwalk sensor variables
+#starting with fDOM and chla
 
+#pull in catwalk sensor data from 2018-2020 from EDI
+if(!file.exists("Catwalk_EDI_2020.csv")){
+  inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/271/5/c1b1f16b8e3edbbff15444824b65fe8f" 
+  infile1 <- paste0(getwd(),"/Catwalk_EDI_2020.csv")
+  download.file(inUrl1,infile1,method="curl")
+}
+
+#need to convert EXO fDOM & chla --> CTD units using equation from above
+catwalk <- readr::read_csv("Catwalk_EDI_2020.csv") %>%
+  dplyr::filter(Reservoir == "FCR", 
+                Site == 50) %>%  #deep hole site code
+  dplyr::rename(time = DateTime)  %>% 
+  dplyr::mutate(time = force_tz(time, "EST"),
+                time = with_tz(time, "UTC")) %>%
+  dplyr::mutate(time = date(time)) %>%
+  dplyr::select(time, EXOChla_ugL_1, EXOfDOM_QSU_1) %>% 
+  dplyr::mutate(CTD_fDOM = EXOfDOM_QSU_1*29.62654 + (-151.3407),
+                CTD_chla = EXOChla_ugL_1*0.3610641 + 1.394732) %>% 
+  na.exclude() %>% 
+  dplyr::group_by(time) %>% 
+  dplyr::summarise(sd = across(c("CTD_fDOM","CTD_chla"),sd),
+                   n = n()) %>% 
+  mutate(se_chla = sd$CTD_chla / sqrt(n),
+         se_fdom = sd$CTD_fDOM / sqrt(n))
+
+median(catwalk$se_chla)
+median(catwalk$se_fdom)
+  
+#####################################################
+#let's now look at within-hour variability of the catwalk sensor variables
+#starting with DO at 5 m and 9 m and all thermistors
+
+#pull in catwalk sensor data from 2018-2020 from EDI
+if(!file.exists("Catwalk_EDI_2020.csv")){
+  inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/271/5/c1b1f16b8e3edbbff15444824b65fe8f" 
+  infile1 <- paste0(getwd(),"/Catwalk_EDI_2020.csv")
+  download.file(inUrl1,infile1,method="curl")
+}
+
+#need to convert EXO fDOM & chla --> CTD units using equation from above
+catwalk <- readr::read_csv("Catwalk_EDI_2020.csv") %>%
+  dplyr::filter(Reservoir == "FCR", 
+                Site == 50) %>%  #deep hole site code
+  dplyr::rename(time = DateTime)  %>% 
+  dplyr::mutate(time = force_tz(time, "EST"),
+                time = with_tz(time, "UTC")) %>%
+  dplyr::mutate(hours = hour(time), 
+                time = date(time)) %>%
+  dplyr::select(time, hours, ThermistorTemp_C_surface:ThermistorTemp_C_9, EXODO_mgL_1,
+                RDO_mgL_5_adjusted, RDO_mgL_9_adjusted) %>% 
+  dplyr::mutate(EXODO_mgL_1 = EXODO_mgL_1*1000/32,
+                RDO_mgL_5_adjusted*1000/32,
+                RDO_mgL_9_adjusted*1000/32) %>% 
+  dplyr::filter(hours == 0) %>% 
+  na.exclude() %>% 
+  dplyr::group_by(time, hours) %>% 
+  dplyr::summarise(sd = across(c("ThermistorTemp_C_surface":"RDO_mgL_9_adjusted"),sd),
+                   n = n()) %>% 
+  mutate(se_temp_surf = sd$ThermistorTemp_C_surface / sqrt(n),
+         se_temp_1 = sd$ThermistorTemp_C_1 / sqrt(n),
+         se_temp_2 = sd$ThermistorTemp_C_2 / sqrt(n),
+         se_temp_3 = sd$ThermistorTemp_C_3 / sqrt(n),
+         se_temp_4 = sd$ThermistorTemp_C_4 / sqrt(n),
+         se_temp_5 = sd$ThermistorTemp_C_5 / sqrt(n),
+         se_temp_6 = sd$ThermistorTemp_C_6 / sqrt(n),
+         se_temp_7 = sd$ThermistorTemp_C_7 / sqrt(n),
+         se_temp_8 = sd$ThermistorTemp_C_8 / sqrt(n),
+         se_temp_9 = sd$ThermistorTemp_C_9 / sqrt(n),
+         se_do_1 = sd$EXODO_mgL_1 / sqrt(n),
+         se_do_5 = sd$RDO_mgL_5_adjusted / sqrt(n),
+         se_do_9 = sd$RDO_mgL_9_adjusted / sqrt(n)) 
+
+medians <- catwalk %>% 
+  na.exclude() %>% 
+  ungroup() %>% 
+  summarise(across(c("se_temp_surf":"se_do_9"), median))
+#choosing highest DO (1 m) and temp (surface) SEs for estimating obs UC
