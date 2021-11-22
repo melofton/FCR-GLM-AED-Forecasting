@@ -13,6 +13,7 @@ setwd("./inputs")
 if(!require('pacman')) install.packages('pacman'); library('pacman')
 pacman::p_load(zoo, EcoHydRology, rMR, tidyverse, magrittr, lubridate, 
                ncdf4, glmtools, GLM3r, birk, dplyr)
+library(tidyverse)
 
 #set the start and end dates of the data going into potential aggregation for
 # your inflow file (you'll nail down exact dates below)
@@ -32,7 +33,7 @@ if(!file.exists('inflow_for_EDI_2013_10Jan2021.csv')){
   download.file(inUrl1,infile1,method="curl")  
 }
 
-inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>% 
+inflow<-readr::read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>% 
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
   dplyr::rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
@@ -226,7 +227,7 @@ write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2015_2020_20211114.csv", row.n
 # First, need to choose which data go into the climatology calculations
 
 clima_start <- as.POSIXct(strptime("2015-07-07", "%Y-%m-%d", tz="EST"))
-clima_end <-as.POSIXct(strptime("2018-07-07", "%Y-%m-%d", tz="EST"))
+clima_end <-as.POSIXct(strptime("2018-07-08", "%Y-%m-%d", tz="EST"))
 
 weir_inflow_dates <- weir_inflow %>% 
   dplyr::filter(time>clima_start & time<clima_end) %>% 
@@ -274,7 +275,13 @@ climatology_mean2 <- climatology_mean1 %>%
 #this is my model, where I predict what stream OGM docr concentrations need to
 # be based off of my 
 
-write.csv(climatology_mean2, "./inputs/climatology_mean_weir_inflow_higherDOCr.csv",row.names = F)
+write.csv(climatology_mean2, "climatology_mean_weir_inflow_higherDOCr.csv",row.names = F)
+
+
+
+
+
+
 
 ######## code that isn't needed now!
 #climatology median inflow
@@ -294,7 +301,7 @@ climatology_mean2 <- climatology_mean1 %>%
   rename(OGM_docr=OGM_docr1)
 
 write.csv(climatology_median1, "climatology_median_weir_inflow.csv",row.names = F)
-
+######## 
 
 
 
