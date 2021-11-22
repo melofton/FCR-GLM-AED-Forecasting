@@ -600,8 +600,8 @@ newdata <- resample_to_field(nc_file, field_file, precision="hours", method='int
                              var_name=var)
 newdata <-newdata[complete.cases(newdata),]
 
-mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
-obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=0.1 & newdata$Depth<=0.1] 
+mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
+obs <- eval(parse(text=paste0("newdata$Observed_",var)))[newdata$Depth>=1.6 & newdata$Depth<=1.6] 
 RMSE(mod,obs)
 
 mod <- eval(parse(text=paste0("newdata$Modeled_",var)))[newdata$Depth>=9 & newdata$Depth<=9] 
