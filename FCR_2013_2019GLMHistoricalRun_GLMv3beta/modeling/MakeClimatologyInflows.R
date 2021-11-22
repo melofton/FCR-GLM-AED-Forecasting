@@ -57,13 +57,14 @@ weir <- merge(datelist, inflow, by="time", all.x=TRUE) %>%
 
 #now let's merge with chemistry
 #first pull in FCR chem data from 2013-2020 from EDI
-if(!file.exists("chemistry_HLW_edited.csv")){
-  inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/8/da174082a3d924e989d3151924f9ef98" 
-  infile1 <- paste0(getwd(),"/chemistry.csv")
+#pull in FCR chem data from 2013-2020 from EDI
+if(!file.exists("chemistry_2013_2020.csv")){
+  inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/9/fe500aac19d1a0d78bb2cb1d196cdbd7" 
+  infile1 <- paste0(getwd(),"/chemistry_2013_2020.csv")
   download.file(inUrl1,infile1,method="curl")
 }
 
-FCRchem <- read.csv("chemistry_HLW_edited.csv", header=T) %>%
+FCRchem <- readr::read_csv("chemistry_2013_2020.csv") %>% 
   select(Reservoir:DIC_mgL) %>%
   dplyr::filter(Reservoir=="FCR") %>%
   dplyr::filter(Site==100) %>% #inflow site code
