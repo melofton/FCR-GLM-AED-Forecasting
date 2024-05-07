@@ -1,11 +1,13 @@
 #*****************************************************************                                                           *
 #* TITLE:   Falling Creek Reservoir GLM-AED stream inflow file 
-#*          preparation                                          *
+#*          preparation: combining 2 inflows into 1                                          *
 #* AUTHORS:  C.C. Carey                                          *
-#* DATE:   Originally developed 16 July 2018; Last modified 26 Sept 2021                            
+#* DATE:   Originally developed 16 July 2018; Last modified April 2022                            
 #* NOTES:  CCC developed to estimate reservoir inflows for FCR; 
 #*         CCC subsequently edited on 1 June 2020 and made tidy,
 #*         with subsequent tweaks to annotation in summer 2021
+#*         And more work to update with local met station + new year of data
+#*         AS WELL AS COMBINING WEIR + WETLAND!
 #*****************************************************************
 
 
@@ -58,11 +60,11 @@ plot(weir$time, weir$TEMP, type = "l", col = "red")
 
 #now let's merge with chemistry
 #first pull in FCR chem data from 2013-2020 from EDI
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/8/da174082a3d924e989d3151924f9ef98" 
-#infile1 <- paste0(getwd(),"/chemistry.csv")
-#download.file(inUrl1,infile1,method="curl")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/9/fe500aac19d1a0d78bb2cb1d196cdbd7"
+#infile1 <- paste0(getwd(),"/chemistry_2013_2020.csv")
+#download.file(inUrl1,infile1,method="curl",extra='-k')
 
-FCRchem <- read.csv("chemistry_HLW_edited.csv", header=T) %>%
+FCRchem <- read.csv("chemistry_2013_2020.csv", header=T) %>%
   select(Reservoir:DIC_mgL) %>%
   dplyr::filter(Reservoir=="FCR") %>%
   dplyr::filter(Site==100) %>%
@@ -74,7 +76,7 @@ FCRchem <- read.csv("chemistry_HLW_edited.csv", header=T) %>%
 #read in lab dataset of dissolved silica, measured in summer 2014 only
 #inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/542/1/791ec9ca0f1cb9361fa6a03fae8dfc95" 
 #infile1 <- paste0(getwd(),"/silica_master_df.csv")
-#download.file(inUrl1,infile1,method="curl")
+#download.file(inUrl1,infile1,method="curl", extra='-k')
 
 silica <- read.csv("silica_master_df.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>% 
@@ -92,11 +94,11 @@ median(silica$DRSI_mgL) #this median concentration is going to be used to set as
 alldata<-merge(weir, FCRchem, by="time", all.x=TRUE)
 
 #read in dataset of CH4 from EDI
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/5/38d72673295864956cccd6bbba99a1a3" 
-#infile1 <- paste0(getwd(),"/Dissolved_CO2_CH4_Virginia_Reservoirs.csv")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/6/38d72673295864956cccd6bbba99a1a3"
+#infile1 <- paste0(getwd(),"/final_GHG_2015-2021.csv")
 #download.file(inUrl1,infile1,method="curl")
 
-ghg <- read.csv("Dissolved_CO2_CH4_Virginia_Reservoirs.csv", header=T) %>%
+ghg <- read.csv("final_GHG_2015-2021.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>%
   dplyr::filter(Site == 100) %>% #weir inflow
   select(DateTime, ch4_umolL) %>%
@@ -115,7 +117,7 @@ datelist2$time<-as.POSIXct(strptime(datelist2$time, "%Y-%m-%d", tz="EST"))
 
 ghg1 <- merge(datelist2, ghg, by="time", all.x=TRUE) 
 ghg1$CAR_ch4 <- na.fill(na.approx(ghg1$CAR_ch4), "extend")
-plot(ghg1$time, ghg1$CAR_ch4) #decent coverage 2015-2019, but need to develop 2013-2014 data that keeps temporal pattern of data
+plot(ghg1$time, ghg1$CAR_ch4) #decent coverage 2015-current, but need to develop 2013-2014 data that keeps temporal pattern of data
 #so, need to average value among years per day of year
 
 missingdata <- ghg1 %>% 
@@ -138,11 +140,40 @@ plot(ghg2$time, ghg2$CAR_ch4)
 #check to make sure it all works: each day's CH4 concentration during
 #2013-early 2015 is the mean daily data for 2015-2020
 
+#read in lab dataset of pH at inflow
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/198/10/b3bd353312f9e37ca392e2a5315cc9da" 
+#infile1 <- paste0(getwd(),"/YSI_PAR_profiles_2013-2021.csv")
+#download.file(inUrl1,infile1,method="curl", extra='-k')
+
+pH <- read.csv("YSI_PAR_profiles_2013-2021.csv", header=T) %>%
+  dplyr::filter(Reservoir == "FCR") %>% 
+  dplyr::filter(Site == 100) %>% #100 = weir inflow site
+  select(DateTime, pH) %>%
+  drop_na() %>% 
+  mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
+  rename(time = DateTime)
+
+#diagnostic plot of pH
+plot(pH$time, pH$pH)
+hist(pH$pH)
+median(pH$pH) #this median concentration is going to be used to set as 
+#the constant pH inflow conc in both wetland & weir inflows
+
+pH <- read.csv("YSI_PAR_profiles_2013-2021.csv", header=T) %>%
+  dplyr::filter(Reservoir == "FCR") %>% 
+  dplyr::filter(Site == 50) %>% #50 = deephole
+  select(DateTime, Depth_m, pH) %>%
+  drop_na() %>% 
+  mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
+  rename(time = DateTime,
+         CAR_pH = pH)
+#write.csv(pH, "field_pH.csv")
+
 
 #some other cool long-term plots
 plot(alldata$time, alldata$SRP_ugL)
 plot(alldata$time, alldata$DOC_mgL)
-plot(alldata$time, alldata$NO3NO2_ugL) #something's off here
+plot(alldata$time, alldata$NO3NO2_ugL)
 plot(alldata$time, alldata$NH4_ugL)
 plot(alldata$time, alldata$TN_ugL)
 plot(alldata$time, alldata$TP_ugL)
@@ -202,7 +233,7 @@ weir_inflow <- alldata %>%
   mutate(OGM_pon = (1/6)*(TN_ugL-(NIT_amm+NIT_nit))) %>% #detemined by subtraction
   mutate(OGM_dop = 0.3*(TP_ugL-PHS_frp)*0.10) %>% #Wetzel page 241, 70% of total organic P = particulate organic; 30% = dissolved organic P
   mutate(OGM_dopr = 0.3*(TP_ugL-PHS_frp)*0.90) %>% #to keep mass balance with DOC & DON, DOPr is 90% of total DOP
-  mutate(OGM_pop = 10*TP_ugL) %>% # #In lieu of having the adsorbed P pool activated in the model, need to have higher complexed P
+  mutate(OGM_pop = TP_ugL-(OGM_dop+OGM_dopr+PHS_frp)) %>% # #In lieu of having the adsorbed P pool activated in the model, need to have higher complexed P
   mutate(CAR_dic = DIC_mgL*1000*(1/52.515)) #Long-term median pH of FCR is 6.5, at which point CO2/HCO3 is about 50-50
 #given this disparity, using a 50-50 weighted molecular weight (44.01 g/mol and 61.02 g/mol, respectively)
 
@@ -211,6 +242,7 @@ weir_inflow <- alldata %>%
 hist(weir_inflow$TP_ugL - (weir_inflow$PHS_frp + weir_inflow$OGM_dop + weir_inflow$OGM_dopr + weir_inflow$OGM_pop))
 hist(weir_inflow$TN_ugL - (weir_inflow$NIT_amm + weir_inflow$NIT_nit + weir_inflow$OGM_don + weir_inflow$OGM_donr + weir_inflow$OGM_pon))
 
+library(rMR)
 #creating OXY_oxy column using RMR package, assuming that oxygen is at 100% saturation in this very well-mixed stream
 for(i in 1:length(weir_inflow$TEMP)){
   weir_inflow$OXY_oxy[i]<-(temp.C= Eq.Ox.conc(weir_inflow$TEMP[i], elevation.m = 506,
@@ -220,15 +252,47 @@ for(i in 1:length(weir_inflow$TEMP)){
 }
 
 #clean it up and get vars in order
-weir_inflow <- weir_inflow %>%
-  select(time, FLOW, TEMP, SALT, OXY_oxy, NIT_amm:CAR_dic, CAR_ch4) %>% 
+weir_inflow1 <- weir_inflow %>%
+  mutate(CAR_pH = rep(median(pH$CAR_pH),length(weir_inflow$time))) %>% #setting median pH to median inflow concentration obs over time
   mutate(SIL_rsi = rep(median(silica$DRSI_mgL),length(weir_inflow$time))) %>%
   mutate(SIL_rsi = SIL_rsi*1000*(1/60.08)) %>% #setting the Silica concentration to the median 2014 inflow concentration for consistency
+  mutate(TRC_tr1 = rep(1,length(weir_inflow$time)),
+         TRC_age = rep(0,length(weir_inflow$time)),
+         NCS_ss1 = rep(1,length(weir_inflow$time)),
+         NCS_ss2 = rep(1,length(weir_inflow$time)),
+         CAR_ch4_bub = rep(0,length(weir_inflow$time)),
+         PHS_frp_ads = PHS_frp*0.2, #from Matt pers comm 11 April 2022
+         OGM_cpom = OGM_poc, #guessing for now
+         PHY_cyano = rep(0,length(weir_inflow$time)),
+         PHY_cyano_IN = rep(0,length(weir_inflow$time)),
+         PHY_cyano_IP = rep(0,length(weir_inflow$time)),
+         PHY_green = rep(0,length(weir_inflow$time)),
+         PHY_green_IN = rep(0,length(weir_inflow$time)),
+         PHY_green_IP = rep(0,length(weir_inflow$time)),
+         PHY_diatom = rep(0,length(weir_inflow$time)),
+         PHY_diatom_IN = rep(0,length(weir_inflow$time)),
+         PHY_diatom_IP = rep(0,length(weir_inflow$time)),
+         BIV_filtfrac = rep(0,length(weir_inflow$time))) %>% 
+  select(time, FLOW, TEMP, SALT, 
+         TRC_tr1, TRC_age, 
+         NCS_ss1, 
+         NCS_ss2, 
+         OXY_oxy, CAR_dic, 
+         CAR_pH, CAR_ch4, 
+         CAR_ch4_bub, 
+         SIL_rsi, NIT_amm, NIT_nit, PHS_frp, 
+         PHS_frp_ads,
+         OGM_doc, OGM_poc, OGM_don, OGM_pon, OGM_dop, OGM_pop, OGM_docr, OGM_donr, 
+         OGM_dopr, 
+         OGM_cpom, 
+         PHY_cyano, PHY_cyano_IN, PHY_cyano_IP, PHY_green, 
+         PHY_green_IN, PHY_green_IP, PHY_diatom, PHY_diatom_IN, PHY_diatom_IP,
+         BIV_filtfrac) %>% 
   mutate_if(is.numeric, round, 4) #round to 4 digits 
 
 #write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
 #write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-write.csv(weir_inflow, "FCR_weir_inflow_2013_2020_20211102_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
+write.csv(weir_inflow1, "FCR_weir_inflow_2013_2020_20220411_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
 
 #copying dataframe in workspace to be used later
 alltdata = alldata
@@ -269,47 +333,47 @@ climatology_mean <- weir_inflow %>%
 
 
 
-########SKIP THIS STEP IF YOU WANT TO USE 2 POOLS OF OC! 
-#The code below is for the 1 pool option
-#note, because there is no recalcitrant DOC in this inflow, there similarly isn't any recalcitrant DON or DOP
-#This is making the weir inflow with only *1* pool of DOC, DON, or DOP
-#need to convert mass observed data into mmol/m3 units for ONE pool of organic carbon
-weir_inflow <- alldata %>% 
-  mutate(NIT_amm = NH4_ugL*1000*0.001*(1/18.04)) %>% 
-  mutate(NIT_nit = NO3NO2_ugL*1000*0.001*(1/62.00)) %>% #as all NO2 is converted to NO3
-  mutate(PHS_frp = SRP_ugL*1000*0.001*(1/94.9714)) %>% 
-  mutate(OGM_doc = DOC_mgL*1000*(1/12.01)) %>% 
-  mutate(TN_ugL = TN_ugL*1000*0.001*(1/14)) %>% 
-  mutate(TP_ugL = TP_ugL*1000*0.001*(1/30.97)) %>% 
-  mutate(OGM_poc = 0.1*(OGM_doc)) %>% #assuming that 10% of DOC is POC (Wetzel page 755)
-  mutate(OGM_don = (5/6)*(TN_ugL-(NIT_amm+NIT_nit))) %>% #DON is ~5x greater than PON (Wetzel page 220)
-  mutate(OGM_pon = (1/6)*(TN_ugL-(NIT_amm+NIT_nit))) %>%
-  mutate(OGM_dop = 0.3*(TP_ugL-PHS_frp)) %>% #Wetzel page 241, 70% of total organic P = particulate organic; 30% = dissolved organic P
-  mutate(OGM_pop = 0.7*(TP_ugL-PHS_frp)) %>% 
-  mutate(PHS_frp_ads = PHS_frp) %>% #Following Farrell et al. 2020 EcolMod
-  mutate(CAR_dic = DIC_mgL*1000*(1/52.515)) #Long-term avg pH of FCR is 6.5, at which point CO2/HCO3 is about 50-50
-#given this disparity, using a 50-50 weighted molecular weight (44.01 g/mol and 61.02 g/mol, respectively)
-
-#reality check of mass balance: these histograms should be at zero minus rounding errors
-hist(weir_inflow$TP_ugL - (weir_inflow$PHS_frp + weir_inflow$OGM_dop + weir_inflow$OGM_pop))
-hist(weir_inflow$TN_ugL - (weir_inflow$NIT_amm + weir_inflow$NIT_nit + weir_inflow$OGM_don + weir_inflow$OGM_pon))
-
-#creating OXY_oxy column using RMR package, assuming that oxygen is at 100% saturation in this very well-mixed stream
-for(i in 1:length(weir_inflow$TEMP)){
-  weir_inflow$OXY_oxy[i]<-(temp.C= Eq.Ox.conc(weir_inflow$TEMP[i], elevation.m = 506,
-                                              bar.press = NULL, bar.units = NULL,
-                                              out.DO.meas = "mg/L",
-                                              salinity = 0, salinity.units = "pp.thou"))*1000*(1/32)
-}
-
-weir_inflow <- weir_inflow %>%
-  select(time, FLOW, TEMP, SALT, OXY_oxy, NIT_amm:CAR_dic, CAR_ch4) %>% 
-  mutate(SIL_rsi = rep(median(silica$DRSI_mgL),length(weir_inflow$time))) %>%
-  mutate(SIL_rsi = SIL_rsi*1000*(1/60.08)) %>% #setting the Silica concentration to the median 2014 inflow concentration for consistency
-  mutate_if(is.numeric, round, 4) #round to 4 digits 
-
-write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200607_allfractions_1poolDOC.csv", row.names = F)
-
+# ########SKIP THIS STEP IF YOU WANT TO USE 2 POOLS OF OC! 
+# #The code below is for the 1 pool option
+# #note, because there is no recalcitrant DOC in this inflow, there similarly isn't any recalcitrant DON or DOP
+# #This is making the weir inflow with only *1* pool of DOC, DON, or DOP
+# #need to convert mass observed data into mmol/m3 units for ONE pool of organic carbon
+# weir_inflow <- alldata %>% 
+#   mutate(NIT_amm = NH4_ugL*1000*0.001*(1/18.04)) %>% 
+#   mutate(NIT_nit = NO3NO2_ugL*1000*0.001*(1/62.00)) %>% #as all NO2 is converted to NO3
+#   mutate(PHS_frp = SRP_ugL*1000*0.001*(1/94.9714)) %>% 
+#   mutate(OGM_doc = DOC_mgL*1000*(1/12.01)) %>% 
+#   mutate(TN_ugL = TN_ugL*1000*0.001*(1/14)) %>% 
+#   mutate(TP_ugL = TP_ugL*1000*0.001*(1/30.97)) %>% 
+#   mutate(OGM_poc = 0.1*(OGM_doc)) %>% #assuming that 10% of DOC is POC (Wetzel page 755)
+#   mutate(OGM_don = (5/6)*(TN_ugL-(NIT_amm+NIT_nit))) %>% #DON is ~5x greater than PON (Wetzel page 220)
+#   mutate(OGM_pon = (1/6)*(TN_ugL-(NIT_amm+NIT_nit))) %>%
+#   mutate(OGM_dop = 0.3*(TP_ugL-PHS_frp)) %>% #Wetzel page 241, 70% of total organic P = particulate organic; 30% = dissolved organic P
+#   mutate(OGM_pop = 0.7*(TP_ugL-PHS_frp)) %>% 
+#   mutate(PHS_frp_ads = PHS_frp) %>% #Following Farrell et al. 2020 EcolMod
+#   mutate(CAR_dic = DIC_mgL*1000*(1/52.515)) #Long-term avg pH of FCR is 6.5, at which point CO2/HCO3 is about 50-50
+# #given this disparity, using a 50-50 weighted molecular weight (44.01 g/mol and 61.02 g/mol, respectively)
+# 
+# #reality check of mass balance: these histograms should be at zero minus rounding errors
+# hist(weir_inflow$TP_ugL - (weir_inflow$PHS_frp + weir_inflow$OGM_dop + weir_inflow$OGM_pop))
+# hist(weir_inflow$TN_ugL - (weir_inflow$NIT_amm + weir_inflow$NIT_nit + weir_inflow$OGM_don + weir_inflow$OGM_pon))
+# 
+# #creating OXY_oxy column using RMR package, assuming that oxygen is at 100% saturation in this very well-mixed stream
+# for(i in 1:length(weir_inflow$TEMP)){
+#   weir_inflow$OXY_oxy[i]<-(temp.C= Eq.Ox.conc(weir_inflow$TEMP[i], elevation.m = 506,
+#                                               bar.press = NULL, bar.units = NULL,
+#                                               out.DO.meas = "mg/L",
+#                                               salinity = 0, salinity.units = "pp.thou"))*1000*(1/32)
+# }
+# 
+# weir_inflow <- weir_inflow %>%
+#   select(time, FLOW, TEMP, SALT, OXY_oxy, NIT_amm:CAR_dic, CAR_ch4) %>% 
+#   mutate(SIL_rsi = rep(median(silica$DRSI_mgL),length(weir_inflow$time))) %>%
+#   mutate(SIL_rsi = SIL_rsi*1000*(1/60.08)) %>% #setting the Silica concentration to the median 2014 inflow concentration for consistency
+#   mutate_if(is.numeric, round, 4) #round to 4 digits 
+# 
+# write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200607_allfractions_1poolDOC.csv", row.names = F)
+# 
 
 ##############################################################
 ##############################################################
@@ -335,13 +399,14 @@ inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/454/4/a18421fd2e95c15
 infile1 <- paste0(getwd(),"/2019_Continuum_Discharge.csv")
 download.file(inUrl1,infile1,method="curl")
 
-inflow<-read_csv("inflow_for_EDI_2013_06Mar2020.csv") %>% 
+inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>% 
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
-  rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
+  dplyr::rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
-  dplyr::filter(time < "2020-01-01") %>%
+  dplyr::filter(time < "2021-01-01") %>%
   group_by(time) %>% 
-  summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
+  dplyr::summarise(FLOW=mean(FLOW), TEMP=mean(TEMP))
+ #gives averaged daily flow per day in m3/s
 
 #creating new dataframe with list of all dates
 datelist<-seq.Date(as.Date("2013/05/15"),as.Date("2019/12/31"), "days")
@@ -655,3 +720,157 @@ hist(outflow$FLOW - (wetland$FLOW + weir_inflow$FLOW)) #should be at zero minus 
 
 #write file
 write.csv(outflow, "FCR_spillway_outflow_SUMMED_WeirWetland_2013_2019_20200615.csv", row.names=F)
+
+
+##############################################################
+##############################################################
+#attempt at mass balance of comparison of 2-stream inflows vs current 1 stream inflow
+
+weir_old <- read.csv("inputs/FCR_weir_inflow_2013_2019_20220104_allfractions_2poolsDOC.csv", header=T) %>% 
+  dplyr::mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
+  dplyr::filter(time > "2013-05-16")
+wetland_old <- read.csv("inputs/FCR_wetland_inflow_2013_2019_20220104_allfractions_2DOCpools.csv", header=T) %>% 
+  dplyr::mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
+  dplyr::filter(time > "2013-05-16")
+
+one_inflow <- read.csv("inputs/FCR_weir_inflow_2013_2020_20220411_allfractions_2poolsDOC_1dot5xDOCr.csv", header=T) %>% 
+  dplyr::mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
+  dplyr::filter(time < "2020-01-01")
+
+ammonium_new <- one_inflow$FLOW*one_inflow$NIT_amm 
+ammonium_old <- weir_old$FLOW*weir_old$NIT_amm + wetland_old$FLOW*wetland_old$NIT_amm
+
+plot(weir_old$time, ammonium_old)
+lines(weir_old$time, ammonium_new, col="red")
+
+water_old <- weir_old$FLOW + wetland_old$FLOW
+water_new <- one_inflow$FLOW
+
+plot(weir_old$time, water_old)
+lines(weir_old$time, water_new, col="red")
+
+frp_old <- weir_old$FLOW*weir_old$PHS_frp + wetland_old$FLOW*wetland_old$PHS_frp
+frp_new <- one_inflow$FLOW*one_inflow$PHS_frp
+
+plot(weir_old$time, frp_old)#, ylim=c(0,0.3))
+lines(weir_old$time, frp_new, col="red")
+
+nit_old <- weir_old$FLOW*weir_old$NIT_nit + wetland_old$FLOW*wetland_old$NIT_nit
+nit_new <- one_inflow$FLOW*one_inflow$NIT_nit
+
+plot(weir_old$time, nit_old, ylim=c(0,0.3))
+lines(weir_old$time, nit_new, col="red")
+
+docr_old <- weir_old$FLOW*weir_old$OGM_docr + wetland_old$FLOW*wetland_old$OGM_docr
+docr_new <- one_inflow$FLOW*one_inflow$OGM_docr
+
+plot(weir_old$time, docr_old)
+lines(weir_old$time, docr_new, col="red")
+
+docl_old <- weir_old$FLOW*weir_old$OGM_doc + wetland_old$FLOW*wetland_old$OGM_doc
+docl_new <- one_inflow$FLOW*one_inflow$OGM_doc
+
+plot(weir_old$time, docl_old)
+lines(weir_old$time, docl_new, col="red")
+
+plot(weir_old$time, weir_old$TEMP)
+lines(one_inflow$time, one_inflow$TEMP, col="red")
+lines(wetland_old$time, wetland_old$TEMP, col="blue")
+
+don_old <- weir_old$FLOW*weir_old$OGM_don + wetland_old$FLOW*wetland_old$OGM_don
+don_new <- one_inflow$FLOW*one_inflow$OGM_don
+
+plot(weir_old$time, don_old)
+lines(weir_old$time[2:2422], don_new, col="red")
+
+donr_old <- weir_old$FLOW*weir_old$OGM_donr + wetland_old$FLOW*wetland_old$OGM_donr
+donr_new <- one_inflow$FLOW*one_inflow$OGM_donr
+
+plot(weir_old$time, donr_old)
+lines(weir_old$time[2:2422], donr_new, col="red")
+
+pon_old <- weir_old$FLOW*weir_old$OGM_pon + wetland_old$FLOW*wetland_old$OGM_pon
+pon_new <- one_inflow$FLOW*one_inflow$OGM_pon
+
+plot(weir_old$time, pon_old)
+lines(weir_old$time[2:2422], pon_new, col="red")
+
+
+plot(one_inflow$OGM_pon)
+plot(weir_old$OGM_pon)
+plot(wetland_old$OGM_pon)
+
+#######
+#merged inflow 
+weir_old <- read.csv("FCR_weir_inflow_2013_2019_20220104_allfractions_2poolsDOC.csv", header=T) %>% 
+  dplyr::mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) 
+wetland_old <- read.csv("FCR_wetland_inflow_2013_2019_20220104_allfractions_2DOCpools.csv", header=T) %>% 
+  dplyr::mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) 
+
+merged <- merge(weir_old, wetland_old, by="time") %>% 
+  mutate(FLOW = FLOW.x + FLOW.y,
+         TEMP = TEMP.x,
+         SALT = SALT.x,
+         OXY_oxy = OXY_oxy.x,
+         NIT_amm = ((NIT_amm.x*FLOW.x + NIT_amm.y*FLOW.y)/FLOW),
+         NIT_nit = ((NIT_nit.x*FLOW.x + NIT_nit.y*FLOW.y)/FLOW),
+         PHS_frp = ((PHS_frp.x*FLOW.x + PHS_frp.y*FLOW.y)/FLOW),
+         OGM_doc = ((OGM_doc.x*FLOW.x + OGM_doc.y*FLOW.y)/FLOW),
+         OGM_docr= ((OGM_docr.x*FLOW.x + OGM_docr.y*FLOW.y)/FLOW),
+         OGM_poc = ((OGM_poc.x*FLOW.x + OGM_poc.y*FLOW.y)/FLOW),
+         OGM_don = ((OGM_don.x*FLOW.x + OGM_don.y*FLOW.y)/FLOW),
+         OGM_donr= ((OGM_donr.x*FLOW.x + OGM_donr.y*FLOW.y)/FLOW),
+         OGM_pon = ((OGM_pon.x*FLOW.x + OGM_pon.y*FLOW.y)/FLOW),
+         OGM_dop = ((OGM_dop.x*FLOW.x + OGM_dop.y*FLOW.y)/FLOW),
+         OGM_dopr=((OGM_dopr.x*FLOW.x + OGM_dopr.y*FLOW.y)/FLOW),
+         OGM_pop =((OGM_pop.x*FLOW.x + OGM_pop.y*FLOW.y)/FLOW),
+         CAR_dic =((CAR_dic.x*FLOW.x + CAR_dic.y*FLOW.y)/FLOW),
+         CAR_ch4 =((CAR_ch4.x*FLOW.x + CAR_ch4.y*FLOW.y)/FLOW),
+         SIL_rsi = SIL_rsi.x) %>% 
+  select(time, FLOW:SIL_rsi)
+
+  weir_inflow1 <- merged %>%
+  mutate(CAR_pH = rep(median(pH$CAR_pH),length(merged$time))) %>% #setting median pH to median inflow concentration obs over time
+  #mutate(SIL_rsi = rep(median(silica$DRSI_mgL),length(weir_inflow$time))) %>%
+  #mutate(SIL_rsi = SIL_rsi*1000*(1/60.08)) %>% #setting the Silica concentration to the median 2014 inflow concentration for consistency
+  mutate(TRC_tr1 = rep(1,length(merged$time)),
+         TRC_age = rep(0,length(merged$time)),
+         NCS_ss1 = rep(1,length(merged$time)),
+         NCS_ss2 = rep(1,length(merged$time)),
+         CAR_ch4_bub = rep(0,length(merged$time)),
+         PHS_frp_ads = PHS_frp*0.2, #from Matt pers comm 11 April 2022
+         OGM_cpom = OGM_poc, #guessing for now
+         PHY_cyano = rep(0,length(merged$time)),
+         PHY_cyano_IN = rep(0,length(merged$time)),
+         PHY_cyano_IP = rep(0,length(merged$time)),
+         PHY_green = rep(0,length(merged$time)),
+         PHY_green_IN = rep(0,length(merged$time)),
+         PHY_green_IP = rep(0,length(merged$time)),
+         PHY_diatom = rep(0,length(merged$time)),
+         PHY_diatom_IN = rep(0,length(merged$time)),
+         PHY_diatom_IP = rep(0,length(merged$time)),
+         BIV_filtfrac = rep(0,length(merged$time))) %>% 
+  select(time, FLOW, TEMP, SALT, 
+         TRC_tr1, TRC_age, 
+         NCS_ss1, 
+         NCS_ss2, 
+         OXY_oxy, CAR_dic, 
+         CAR_pH, CAR_ch4, 
+         CAR_ch4_bub, 
+         SIL_rsi, NIT_amm, NIT_nit, PHS_frp, 
+         PHS_frp_ads,
+         OGM_doc, OGM_poc, OGM_don, OGM_pon, OGM_dop, OGM_pop, OGM_docr, OGM_donr, 
+         OGM_dopr, 
+         OGM_cpom, 
+         PHY_cyano, PHY_cyano_IN, PHY_cyano_IP, PHY_green, 
+         PHY_green_IN, PHY_green_IP, PHY_diatom, PHY_diatom_IN, PHY_diatom_IP,
+         BIV_filtfrac) %>% 
+  mutate_if(is.numeric, round, 4) #round to 4 digits 
+
+#write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
+#write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
+write.csv(weir_inflow1, "FCR_weir_inflow_2013_2020_20220428_allfractions_2poolsDOC_merged.csv", row.names = F)
+
+         
+
+
