@@ -147,7 +147,7 @@
 &aed_carbon
    !-- DIC and pH --
    dic_initial = 91
-   Fsed_dic = 0.001
+   Fsed_dic = 0.0001!0.01
    Ksed_dic = 53.44356346
    theta_sed_dic = 1.08
    pH_initial = 6.2
