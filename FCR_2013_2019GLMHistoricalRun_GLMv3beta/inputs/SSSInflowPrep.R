@@ -2,7 +2,7 @@
 #* TITLE:   Falling Creek Reservoir GLM-AED HOx submerged inflow 
 #*         driver file preparation                               *
 #* AUTHORS:  C.C. Carey                                          *
-#* DATE:   Originally developed 16 July 2018; Last modified 11 Avril 2022                           
+#* DATE:   Originally developed 16 July 2018; Last modified 6 May 2024                           
 #* NOTES:  CCC subsequently edited on 1 June 2020 and made tidy,
 #*         with subsequent tweaks to annotation in summer 2021. 
 #*         SSS = side stream supersaturation, another way of describing
@@ -18,15 +18,15 @@ library(lubridate)
 library(magrittr)
 
 #pull in SSS operations file 
-inflowoxy <- read.csv("Calc_HOX_flow_DO_20211102.csv", header=T) %>%
+inflowoxy <- read.csv("Calc_HOX_flow_DO_20240315.csv", header=T) %>%
 #within this file, the eductor nozzles increased flow rate by a factor of 4, so 227 LPM = 1135 LPM
-  select(time,SSS_m3.day,mmol.O2.m3.day) %>%
-  mutate(SSS_m3.day = SSS_m3.day * (1/86400))  %>%
+  dplyr::select(time,SSS_m3.day,mmol.O2.m3.day) %>%
+  dplyr::mutate(SSS_m3.day = SSS_m3.day * (1/86400))  %>%
   #convert m3/day to m3/second as needed by GLM
-  mutate(SALT = rep(0,length(inflowoxy$time))) %>%
+  dplyr::mutate(SALT = 0) %>%
   #add salt column as needed by GLM
-  mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
-  rename(FLOW = SSS_m3.day, OXY_oxy=mmol.O2.m3.day)
+  dplyr::mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
+  dplyr::rename(FLOW = SSS_m3.day, OXY_oxy=mmol.O2.m3.day)
 
 #some diagnostic plots
 plot(inflowoxy$time, inflowoxy$FLOW, type = "o")
@@ -77,16 +77,17 @@ highox <- inflowoxy %>%
 
 #now, need to set water temperature of this file to CTD observations at 8 m, the depth
 # the HOx injects water into the hypolimnion
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/200/12/0a62d1946e8d9a511bc1404e69e59b8c" 
-#infile1 <- paste0(getwd(),"/CTD_2013_2021.csv")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/200/14/0432a298a90b2b662f26c46071f66b8a" 
+#infile1 <- paste0(getwd(),"/CTD_2013_2023.csv")
 #download.file(inUrl1,infile1,method="curl")
 
-CTD<-read.csv("CTD_2013_2021.csv", header=TRUE) #now need to get temp at 8m for inflow
+#in future years, need to add a filter for 
+CTD<-read.csv("CTD_2013_2023.csv", header=TRUE) #now need to get temp at 8m for inflow
 CTD8 <- CTD %>%
   select(Reservoir:Temp_C) %>%
   dplyr::filter(Reservoir=="FCR") %>%
   dplyr::filter(Site==50) %>%
-  rename(time=Date, TEMP=Temp_C) %>%
+  rename(time=DateTime, TEMP=Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
   mutate(Depth_m = round(Depth_m, digits=0)) %>%
   group_by(time) %>% 
@@ -102,12 +103,14 @@ SSS_inflowALL<-merge(highox,CTD8, by="time",all.x=TRUE)
 SSS_inflowALL$TEMP[231]<-4
 SSS_inflowALL$TEMP[596]<-4
 SSS_inflowALL$TEMP[961]<-4
-SSS_inflowALL$TEMP[1326]<-4
-SSS_inflowALL$TEMP[1691]<-4
-SSS_inflowALL$TEMP[2056]<-4
+SSS_inflowALL$TEMP[1327]<-4
+SSS_inflowALL$TEMP[1692]<-4
+SSS_inflowALL$TEMP[2057]<-4
 SSS_inflowALL$TEMP[2422]<-4 
 SSS_inflowALL$TEMP[2788]<-4 
-SSS_inflowALL$TEMP[3153]<-4 #set last row as 4oC in prep for freezing
+SSS_inflowALL$TEMP[3153]<-4 
+SSS_inflowALL$TEMP[3518]<-4
+SSS_inflowALL$TEMP[3883]<-4#set last row as 4oC in prep for freezing
 SSS_inflowALL$TEMP<-na.fill(na.approx(SSS_inflowALL$TEMP),"extend")
 plot(SSS_inflowALL$time, SSS_inflowALL$TEMP, type = "o")
 
@@ -133,4 +136,4 @@ SSS_inflowALL1[which(duplicated(SSS_inflowALL1$time)),] #identify if there are r
 SSS_inflowALL1 <- SSS_inflowALL1[(!duplicated(SSS_inflowALL1$time)),] #remove repeated dates
 
 #et voila! the final observed inflow file for the SSS for 2 pools of DOC
-write.csv(SSS_inflowALL1, "FCR_SSS_inflow_2013_2021_20220413_allfractions_2DOCpools.csv", row.names = FALSE)
+write.csv(SSS_inflowALL1, "FCR_SSS_inflow_2013_2023_20240510_allfractions_2DOCpools.csv", row.names = FALSE)

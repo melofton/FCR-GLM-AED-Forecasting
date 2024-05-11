@@ -2,7 +2,7 @@
 #* TITLE:   Falling Creek Reservoir GLM-AED stream inflow file 
 #*          preparation: combining 2 inflows into 1                                          *
 #* AUTHORS:  C.C. Carey                                          *
-#* DATE:   Originally developed 16 July 2018; Last modified April 2022                            
+#* DATE:   Originally developed 16 July 2018; Last modified May 2024                            
 #* NOTES:  CCC developed to estimate reservoir inflows for FCR; 
 #*         CCC subsequently edited on 1 June 2020 and made tidy,
 #*         with subsequent tweaks to annotation in summer 2021
@@ -24,16 +24,16 @@ library(tidyverse)
 library(lubridate)
 library(dplyr)
 
-#first read in FCR weir inflow file from EDI (updated for 2013-Dec 2020)
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/7/f5fa5de4b49bae8373f6e7c1773b026e" 
-#infile1 <- paste0(getwd(),"/inflow_for_EDI_2013_10Jan2021.csv")
+#first read in FCR weir inflow file from EDI (updated for 2013-Dec 2023)
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/11/aae7888d68753b276d1623680f81d5de" 
+#infile1 <- paste0(getwd(),"/Inflow_2013_2023.csv")
 #download.file(inUrl1,infile1,method="curl")
 
-inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>% 
+inflow<-read_csv("Inflow_2013_2023.csv") %>% 
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
   dplyr::rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
   mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
-  dplyr::filter(time < "2021-01-01") %>%
+  dplyr::filter(time < "2024-01-01") %>%
   group_by(time) %>% 
   dplyr::summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
  
@@ -41,7 +41,7 @@ inflow<-read_csv("inflow_for_EDI_2013_10Jan2021.csv") %>%
 plot(inflow$time, inflow$FLOW)
 
 #creating new dataframe with list of all dates
-datelist<-seq.Date(as.Date("2013/05/16"),as.Date("2020/12/31"), "days") #changed from May 15, 2013 because of NA in flow
+datelist<-seq.Date(as.Date("2013/05/16"),as.Date("2023/12/31"), "days") #changed from May 15, 2013 because of NA in flow
 datelist<-as.data.frame(datelist)
 colnames(datelist)=c("time")
 datelist$time<-as.POSIXct(strptime(datelist$time, "%Y-%m-%d", tz="EST"))
@@ -60,11 +60,11 @@ plot(weir$time, weir$TEMP, type = "l", col = "red")
 
 #now let's merge with chemistry
 #first pull in FCR chem data from 2013-2020 from EDI
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/9/fe500aac19d1a0d78bb2cb1d196cdbd7"
-#infile1 <- paste0(getwd(),"/chemistry_2013_2020.csv")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/12/a33a5283120c56e90ea414e76d5b7ddb"
+#infile1 <- paste0(getwd(),"/Chemistry_2013_2023.csv")
 #download.file(inUrl1,infile1,method="curl",extra='-k')
 
-FCRchem <- read.csv("chemistry_2013_2020.csv", header=T) %>%
+FCRchem <- read.csv("Chemistry_2013_2023.csv", header=T) %>%
   select(Reservoir:DIC_mgL) %>%
   dplyr::filter(Reservoir=="FCR") %>%
   dplyr::filter(Site==100) %>%
@@ -94,20 +94,20 @@ median(silica$DRSI_mgL) #this median concentration is going to be used to set as
 alldata<-merge(weir, FCRchem, by="time", all.x=TRUE)
 
 #read in dataset of CH4 from EDI
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/6/38d72673295864956cccd6bbba99a1a3"
-#infile1 <- paste0(getwd(),"/final_GHG_2015-2021.csv")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/8/454c11035c491710243cae0423efbe7b"
+#infile1 <- paste0(getwd(),"/GHG_2015_2023.csv")
 #download.file(inUrl1,infile1,method="curl")
 
-ghg <- read.csv("final_GHG_2015-2021.csv", header=T) %>%
+ghg <- read.csv("GHG_2015_2023.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>%
   dplyr::filter(Site == 100) %>% #weir inflow
-  select(DateTime, ch4_umolL) %>%
+  select(DateTime, CH4_umolL) %>%
   mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
-  rename(time = DateTime, CAR_ch4 = ch4_umolL) %>%
+  rename(time = DateTime, CAR_ch4 = CH4_umolL) %>%
   group_by(time) %>%
   drop_na %>% 
-  summarise(CAR_ch4 = mean(CAR_ch4)) %>%
-  dplyr::filter(CAR_ch4<0.2) #remove outliers
+  summarise(CAR_ch4 = mean(CAR_ch4)) #%>%
+  #dplyr::filter(CAR_ch4<0.2) #remove outliers
 plot(ghg$time, ghg$CAR_ch4)
 
 datelist2<-seq.Date(as.Date(first(ghg$time)),as.Date(last(ghg$time)), "days")
@@ -120,12 +120,15 @@ ghg1$CAR_ch4 <- na.fill(na.approx(ghg1$CAR_ch4), "extend")
 plot(ghg1$time, ghg1$CAR_ch4) #decent coverage 2015-current, but need to develop 2013-2014 data that keeps temporal pattern of data
 #so, need to average value among years per day of year
 
+#but, need to exclude high CH4 data occurring post 2022, so will only build this
+#DOY model off of 2015-2021 data
 missingdata <- ghg1 %>% 
+  dplyr::filter(time<"2022-01-01") |> 
   mutate(DOY = yday(time)) %>%
   group_by(DOY) %>%
   summarise(CAR_ch4=mean(CAR_ch4))
 plot(missingdata$DOY, missingdata$CAR_ch4)
-#gives us DOY concentrations averaged across 2015-2019
+#gives us DOY concentrations averaged across 2015-2021
 #now, need to apply this averaged DOY concentration to 2013-2014 missing dates
 
 ghg2 <- merge(datelist, ghg1, by="time", all.x=TRUE) %>% 
@@ -138,14 +141,14 @@ for(i in 1:length(ghg2$time)){
 }  
 plot(ghg2$time, ghg2$CAR_ch4)
 #check to make sure it all works: each day's CH4 concentration during
-#2013-early 2015 is the mean daily data for 2015-2020
+#2013-early 2015 is the mean daily data from 2015-2021; 2022-present data has not been used
 
 #read in lab dataset of pH at inflow
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/198/10/b3bd353312f9e37ca392e2a5315cc9da" 
-#infile1 <- paste0(getwd(),"/YSI_PAR_profiles_2013-2021.csv")
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/198/11/6e5a0344231de7fcebbe6dc2bed0a1c3" 
+#infile1 <- paste0(getwd(),"/YSI_PAR_profiles_2013-2022.csv")
 #download.file(inUrl1,infile1,method="curl", extra='-k')
 
-pH <- read.csv("YSI_PAR_profiles_2013-2021.csv", header=T) %>%
+pH <- read.csv("YSI_PAR_profiles_2013-2022.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>% 
   dplyr::filter(Site == 100) %>% #100 = weir inflow site
   select(DateTime, pH) %>%
@@ -159,14 +162,14 @@ hist(pH$pH)
 median(pH$pH) #this median concentration is going to be used to set as 
 #the constant pH inflow conc in both wetland & weir inflows
 
-pH <- read.csv("YSI_PAR_profiles_2013-2021.csv", header=T) %>%
-  dplyr::filter(Reservoir == "FCR") %>% 
-  dplyr::filter(Site == 50) %>% #50 = deephole
-  select(DateTime, Depth_m, pH) %>%
-  drop_na() %>% 
-  mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
-  rename(time = DateTime,
-         CAR_pH = pH)
+#pH <- read.csv("YSI_PAR_profiles_2013-2022.csv", header=T) %>%
+#  dplyr::filter(Reservoir == "FCR") %>% 
+#  dplyr::filter(Site == 50) %>% #50 = deephole
+#  select(DateTime, Depth_m, pH) %>%
+#  drop_na() %>% 
+#  mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
+#  rename(time = DateTime,
+#         CAR_pH = pH)
 #write.csv(pH, "field_pH.csv")
 
 
@@ -253,7 +256,7 @@ for(i in 1:length(weir_inflow$TEMP)){
 
 #clean it up and get vars in order
 weir_inflow1 <- weir_inflow %>%
-  mutate(CAR_pH = rep(median(pH$CAR_pH),length(weir_inflow$time))) %>% #setting median pH to median inflow concentration obs over time
+  mutate(CAR_pH = rep(median(pH$pH),length(weir_inflow$time))) %>% #setting median pH to median inflow concentration obs over time
   mutate(SIL_rsi = rep(median(silica$DRSI_mgL),length(weir_inflow$time))) %>%
   mutate(SIL_rsi = SIL_rsi*1000*(1/60.08)) %>% #setting the Silica concentration to the median 2014 inflow concentration for consistency
   mutate(TRC_tr1 = rep(1,length(weir_inflow$time)),
@@ -292,7 +295,9 @@ weir_inflow1 <- weir_inflow %>%
 
 #write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
 #write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-write.csv(weir_inflow1, "FCR_weir_inflow_2013_2020_20220411_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
+write.csv(weir_inflow1, "FCR_weir_inflow_2013_2023_20240510_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
+#this is the version of the inflow files that Kamilla uses for her model
+
 
 #copying dataframe in workspace to be used later
 alltdata = alldata
@@ -307,7 +312,7 @@ outflow <- weir_inflow %>% #from above: this has both stream inflows together
 plot(outflow$time, outflow$FLOW)
 
 #write file
-write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2020_20211102.csv", row.names=F)
+write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2023_20240510.csv", row.names=F)
 ##############################################
 
 #creating climatology weir inflow file for Quinn: average of day of year for all analytes
@@ -387,7 +392,7 @@ climatology_mean <- weir_inflow %>%
 #Tunnel Branch = weir inflow
 #Falling Creek = wetland inflow
 
-#First let's read in the wetland pricipitation-driven flow (runoff) calculated from the Schuler equation
+#First let's read in the wetland precipitation-driven flow (runoff) calculated from the Schuler equation
 # as output of the WetlandInflowPrep.R script.
 runoff <- read.csv("WetlandWeir_Runoff_FCR_20200615.csv", header=T) %>% 
   mutate(DateTime = as.POSIXct(strptime(DateTime, "%Y-%m-%d", tz="EST"))) %>%
