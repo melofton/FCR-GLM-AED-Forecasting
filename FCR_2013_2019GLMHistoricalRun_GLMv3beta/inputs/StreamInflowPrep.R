@@ -25,7 +25,7 @@ library(lubridate)
 library(dplyr)
 
 #first read in FCR weir inflow file from EDI (updated for 2013-Dec 2023)
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/11/aae7888d68753b276d1623680f81d5de" 
+#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/12/aae7888d68753b276d1623680f81d5de" 
 #infile1 <- paste0(getwd(),"/Inflow_2013_2023.csv")
 #download.file(inUrl1,infile1,method="curl")
 
@@ -295,7 +295,7 @@ weir_inflow1 <- weir_inflow %>%
 
 #write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
 #write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-write.csv(weir_inflow1, "FCR_weir_inflow_2013_2023_20240510_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
+write.csv(weir_inflow1, "FCR_weir_inflow_2013_2023_20240530_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
 #this is the version of the inflow files that Kamilla uses for her model
 
 
@@ -312,7 +312,7 @@ outflow <- weir_inflow %>% #from above: this has both stream inflows together
 plot(outflow$time, outflow$FLOW)
 
 #write file
-write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2023_20240510.csv", row.names=F)
+write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2023_20240530.csv", row.names=F)
 ##############################################
 
 #creating climatology weir inflow file for Quinn: average of day of year for all analytes
