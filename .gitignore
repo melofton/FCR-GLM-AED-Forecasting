@@ -15,3 +15,9 @@ output_2013_2019.nc
 .DS_Store
 DS_Store
 FCR_2013_2019GLMHistoricalRun_GLMv3beta/.DS_Store
+Chemistry_2013_2023.csv
+GHG_2015_2023.csv
+Inflow_2013_2023.csv
+Inflow_ratingcurve_2013_2023.csv
+YSI_PAR_profiles_2013-2022.csv
+silica_master_df.csv

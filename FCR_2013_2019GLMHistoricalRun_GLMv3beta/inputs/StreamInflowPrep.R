@@ -25,9 +25,9 @@ library(lubridate)
 library(dplyr)
 
 #first read in FCR weir inflow file from EDI (updated for 2013-Dec 2023)
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/12/aae7888d68753b276d1623680f81d5de" 
-#infile1 <- paste0(getwd(),"/Inflow_2013_2023.csv")
-#download.file(inUrl1,infile1,method="curl")
+# inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/202/12/aae7888d68753b276d1623680f81d5de"
+# infile1 <- paste0(getwd(),"/Inflow_2013_2023.csv")
+# download.file(inUrl1,infile1,method="curl")
 
 inflow<-read_csv("Inflow_2013_2023.csv") %>% 
   dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
@@ -40,6 +40,68 @@ inflow<-read_csv("Inflow_2013_2023.csv") %>%
 #diagnostic plot
 plot(inflow$time, inflow$FLOW)
 
+#get rating curve data for drawdown period for WVWA sensor
+# inUrl1  <- "https://portal.edirepository.org/nis/dataviewer?packageid=edi.202.12&entityid=9024c478e77a0997f9fefc290963bc0b"
+# infile1 <- paste0(getwd(),"/Inflow_ratingcurve_2013_2023.csv")
+# download.file(inUrl1,infile1,method="curl")
+
+rating_curves <- read_csv("Inflow_ratingcurve_2013_2023.csv") %>%
+  filter(date(Start) == "2022-05-09") # these are the curve we need for pressure sensors during drawdown
+
+drawdown <- read_csv("Inflow_2013_2023.csv") %>%
+  dplyr::filter(DateTime >= "2022-05-18 20:00:00" & DateTime <= "2022-07-05 19:45:00") # filter to drawdown dates reported in Lewis et al. 2024 + one week after pipe was closed to allow for flow subsidence
+
+# plot to see when we know weir was overtopped and flagged it
+ggplot(data = drawdown, aes(x = DateTime, y = WVWA_Pressure_psia, group = as.factor(Flag_VT_Flow_cms), color = as.factor(Flag_VT_Flow_cms)))+
+  geom_point()+
+  theme_classic()
+ggplot(data = drawdown, aes(x = DateTime, y = VT_Pressure_psia, group = as.factor(Flag_VT_Flow_cms), color = as.factor(Flag_VT_Flow_cms)))+
+  geom_point()+
+  theme_classic()
+# oh boy; we've been interpolating right through drawdown due to missing WVWA data; I think this might be a problem!!!!!!!!!!!
+# best solution I have is to use VT sensor during this time for flow and sub it into GLM-AED driver files
+
+vt_ratingcurve_slope <- rating_curves %>%
+  dplyr::filter(Sensor == "VT_Flow_cms") %>%
+  dplyr::pull(Slope) %>%
+  as.numeric()
+
+vt_ratingcurve_intercept <- rating_curves %>%
+  dplyr::filter(Sensor == "VT_Flow_cms") %>%
+  dplyr::pull(Intercept) %>%
+  as.numeric()
+
+# this accounts for overtopping
+B = 0.953 + 1.99 + 1.59 # channel width in meters (see 'WeirMeasurements.jpg')
+
+drawdown_correction <- drawdown %>%
+  dplyr::filter(Flag_VT_Flow_cms == 6) %>% # filter for when we know weir was overtopped
+  dplyr::mutate(VT_gaugeHeight_cm = vt_ratingcurve_slope * VT_Pressure_psia + vt_ratingcurve_intercept) %>%
+  dplyr::mutate(VT_waterLevel_m = VT_gaugeHeight_cm / 100) %>%
+  dplyr::mutate(VT_Flow_cms_corrected = 2.391 * (0.275^2.5) + (1.84 * B * ( (VT_waterLevel_m - 0.275)^1.5) ) )
+
+# plot to see difference
+ggplot(data = drawdown_correction)+
+  geom_line(aes(x = DateTime, y = VT_Flow_cms), col = "black")+
+  geom_line(aes(x = DateTime, y = VT_Flow_cms_corrected), col = "red")+
+  theme_bw()+
+  ggtitle("Red line accounts for weir overtopping during drawdown")
+
+# get final dataframe
+drawdown_correction_final <- drawdown_correction %>%
+  select(DateTime, VT_Flow_cms_corrected)
+
+# join back into all inflow dataframe
+inflow_corrected <- read_csv("Inflow_2013_2023.csv") %>% 
+  dplyr::select(DateTime, WVWA_Flow_cms, WVWA_Temp_C) %>% 
+  dplyr::left_join(.,drawdown_correction_final, by = "DateTime") %>%
+  dplyr::mutate(WVWA_Flow_cms = ifelse(!is.na(VT_Flow_cms_corrected), VT_Flow_cms_corrected, WVWA_Flow_cms)) %>%
+  dplyr::rename(time=DateTime, FLOW=WVWA_Flow_cms, TEMP=WVWA_Temp_C) %>%
+  mutate(time = as.POSIXct(strptime(time, "%Y-%m-%d", tz="EST"))) %>%
+  dplyr::filter(time < "2024-01-01") %>%
+  group_by(time) %>% 
+  dplyr::summarise(FLOW=mean(FLOW), TEMP=mean(TEMP)) #gives averaged daily flow per day in m3/s
+
 #creating new dataframe with list of all dates
 datelist<-seq.Date(as.Date("2013/05/16"),as.Date("2023/12/31"), "days") #changed from May 15, 2013 because of NA in flow
 datelist<-as.data.frame(datelist)
@@ -48,7 +110,7 @@ datelist$time<-as.POSIXct(strptime(datelist$time, "%Y-%m-%d", tz="EST"))
 
 #merge inflow file with datelist to make sure that we have all days covered 
   #interpolating the few missing days
-weir <- merge(datelist, inflow, by="time", all.x=TRUE) %>%
+weir <- merge(datelist, inflow_corrected, by="time", all.x=TRUE) %>%
   mutate(FLOW = na.fill(na.approx(FLOW),"extend")) %>%
   mutate(TEMP = na.fill(na.approx(TEMP),"extend")) %>%
   mutate(SALT = rep(0,length(datelist)))
@@ -60,9 +122,9 @@ plot(weir$time, weir$TEMP, type = "l", col = "red")
 
 #now let's merge with chemistry
 #first pull in FCR chem data from 2013-2020 from EDI
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/12/a33a5283120c56e90ea414e76d5b7ddb"
-#infile1 <- paste0(getwd(),"/Chemistry_2013_2023.csv")
-#download.file(inUrl1,infile1,method="curl",extra='-k')
+# inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/12/a33a5283120c56e90ea414e76d5b7ddb"
+# infile1 <- paste0(getwd(),"/Chemistry_2013_2023.csv")
+# download.file(inUrl1,infile1,method="curl",extra='-k')
 
 FCRchem <- read.csv("Chemistry_2013_2023.csv", header=T) %>%
   select(Reservoir:DIC_mgL) %>%
@@ -74,9 +136,9 @@ FCRchem <- read.csv("Chemistry_2013_2023.csv", header=T) %>%
   select(time:DIC_mgL) 
 
 #read in lab dataset of dissolved silica, measured in summer 2014 only
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/542/1/791ec9ca0f1cb9361fa6a03fae8dfc95" 
-#infile1 <- paste0(getwd(),"/silica_master_df.csv")
-#download.file(inUrl1,infile1,method="curl", extra='-k')
+# inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/542/1/791ec9ca0f1cb9361fa6a03fae8dfc95"
+# infile1 <- paste0(getwd(),"/silica_master_df.csv")
+# download.file(inUrl1,infile1,method="curl", extra='-k')
 
 silica <- read.csv("silica_master_df.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>% 
@@ -94,9 +156,9 @@ median(silica$DRSI_mgL) #this median concentration is going to be used to set as
 alldata<-merge(weir, FCRchem, by="time", all.x=TRUE)
 
 #read in dataset of CH4 from EDI
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/8/454c11035c491710243cae0423efbe7b"
-#infile1 <- paste0(getwd(),"/GHG_2015_2023.csv")
-#download.file(inUrl1,infile1,method="curl")
+# inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/551/8/454c11035c491710243cae0423efbe7b"
+# infile1 <- paste0(getwd(),"/GHG_2015_2023.csv")
+# download.file(inUrl1,infile1,method="curl")
 
 ghg <- read.csv("GHG_2015_2023.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>%
@@ -144,9 +206,9 @@ plot(ghg2$time, ghg2$CAR_ch4)
 #2013-early 2015 is the mean daily data from 2015-2021; 2022-present data has not been used
 
 #read in lab dataset of pH at inflow
-#inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/198/11/6e5a0344231de7fcebbe6dc2bed0a1c3" 
-#infile1 <- paste0(getwd(),"/YSI_PAR_profiles_2013-2022.csv")
-#download.file(inUrl1,infile1,method="curl", extra='-k')
+# inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/198/11/6e5a0344231de7fcebbe6dc2bed0a1c3"
+# infile1 <- paste0(getwd(),"/YSI_PAR_profiles_2013-2022.csv")
+# download.file(inUrl1,infile1,method="curl", extra='-k')
 
 pH <- read.csv("YSI_PAR_profiles_2013-2022.csv", header=T) %>%
   dplyr::filter(Reservoir == "FCR") %>% 
@@ -295,7 +357,7 @@ weir_inflow1 <- weir_inflow %>%
 
 #write file for inflow for the weir, with 2 pools of OC (DOC + DOCR)  
 #write.csv(weir_inflow, "FCR_weir_inflow_2013_2019_20200624_allfractions_2poolsDOC.csv", row.names = F)
-write.csv(weir_inflow1, "FCR_weir_inflow_2013_2023_20240530_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
+write.csv(weir_inflow1, "FCR_weir_inflow_2013_2023_20240712_allfractions_2poolsDOC_1dot5xDOCr.csv", row.names = F)
 #this is the version of the inflow files that Kamilla uses for her model
 
 
@@ -312,7 +374,7 @@ outflow <- weir_inflow %>% #from above: this has both stream inflows together
 plot(outflow$time, outflow$FLOW)
 
 #write file
-write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2023_20240530.csv", row.names=F)
+write.csv(outflow, "FCR_spillway_outflow_WeirOnly_2013_2023_20240712.csv", row.names=F)
 ##############################################
 
 #creating climatology weir inflow file for Quinn: average of day of year for all analytes
